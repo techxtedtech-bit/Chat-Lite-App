@@ -89,7 +89,15 @@
 
         <!-- User Profile Modal Drawer -->
         <div id="user-profile-modal" class="hidden absolute inset-0 bg-slate-950/80 z-50 flex flex-col justify-end backdrop-blur-sm">
-            <div class="bg-slate-900 border-t border-slate-800 rounded-t-3xl p-5 shadow-2xl flex flex-col gap-4 max-h-[85vh] overflow-y-auto animate-in slide-in-from-bottom duration-200">
+            <div class="bg-slate-900 border-t border-slate-800 rounded-t-3xl p-5 shadow-2xl flex flex-col gap-4 max-h-[85vh] overflow-y-auto animate-in slide-in-from-bottom duration-200 relative">
+                
+                <!-- Scoped Modal Alert/Confirm Container inside User Profile Drawer -->
+                <div id="profile-scoped-modal" class="hidden absolute inset-0 bg-slate-900/95 z-30 flex flex-col items-center justify-center p-4 rounded-t-3xl text-center gap-3">
+                    <h3 id="profile-modal-alert-title" class="font-bold text-sm text-white">Notice</h3>
+                    <p id="profile-modal-alert-message" class="text-xs text-slate-300 leading-relaxed">Alert message here...</p>
+                    <div id="profile-modal-alert-actions" class="flex items-center justify-center gap-2 pt-2"></div>
+                </div>
+
                 <div class="flex justify-between items-center pb-2 border-b border-slate-800">
                     <h3 class="font-bold text-sm text-white">User Profile</h3>
                     <button onclick="closeUserProfileModal()" class="text-slate-400 hover:text-white text-lg cursor-pointer px-2">&times;</button>
@@ -233,6 +241,7 @@
         let selectedMessageIds = new Set();
         let pendingDeleteTimer = null;
         let undoTargetMessage = null;
+        let undoCountdownInterval = null;
         let typingTimeout = null;
 
         if (messagesCache.length > 0) {
@@ -280,6 +289,52 @@
             document.getElementById('custom-modal-confirm-btn').onclick = () => {
                 modal.classList.remove('flex');
                 modal.classList.add('hidden');
+                if (onConfirm) onConfirm();
+            };
+        }
+
+        // Scoped Profile Modal Alert/Confirm for Block button inside User Profile
+        function showProfileAlert(title, message, onOk = null) {
+            const scopedModal = document.getElementById('profile-scoped-modal');
+            document.getElementById('profile-modal-alert-title').textContent = title;
+            document.getElementById('profile-modal-alert-message').textContent = message;
+            
+            const actions = document.getElementById('profile-modal-alert-actions');
+            actions.innerHTML = `<button type="button" id="profile-modal-ok-btn" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl cursor-pointer transition-all">OK</button>`;
+            
+            scopedModal.classList.remove('hidden');
+            scopedModal.classList.add('flex');
+
+            document.getElementById('profile-modal-ok-btn').onclick = () => {
+                scopedModal.classList.remove('flex');
+                scopedModal.classList.add('hidden');
+                if (onOk) onOk();
+            };
+        }
+
+        function showProfileConfirm(title, message, onConfirm, onCancel = null) {
+            const scopedModal = document.getElementById('profile-scoped-modal');
+            document.getElementById('profile-modal-alert-title').textContent = title;
+            document.getElementById('profile-modal-alert-message').textContent = message;
+            
+            const actions = document.getElementById('profile-modal-alert-actions');
+            actions.innerHTML = `
+                <button type="button" id="profile-modal-cancel-btn" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs rounded-xl cursor-pointer transition-all">Cancel</button>
+                <button type="button" id="profile-modal-confirm-btn" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl cursor-pointer transition-all">Confirm</button>
+            `;
+            
+            scopedModal.classList.remove('hidden');
+            scopedModal.classList.add('flex');
+
+            document.getElementById('profile-modal-cancel-btn').onclick = () => {
+                scopedModal.classList.remove('flex');
+                scopedModal.classList.add('hidden');
+                if (onCancel) onCancel();
+            };
+
+            document.getElementById('profile-modal-confirm-btn').onclick = () => {
+                scopedModal.classList.remove('flex');
+                scopedModal.classList.add('hidden');
                 if (onConfirm) onConfirm();
             };
         }
@@ -365,18 +420,20 @@
 
         function closeUserProfileModal() {
             document.getElementById('user-profile-modal').classList.add('hidden');
+            document.getElementById('profile-scoped-modal').classList.remove('flex');
+            document.getElementById('profile-scoped-modal').classList.add('hidden');
         }
 
         function copyChatCode() {
             const codeText = document.getElementById('profile-modal-chatcode').textContent;
             if (codeText && codeText !== '--' && codeText !== 'N/A') {
                 navigator.clipboard.writeText(codeText);
-                showCustomAlert('Copied', 'Unique chat code copied to clipboard!');
+                showProfileAlert('Copied', 'Unique chat code copied to clipboard!');
             }
         }
 
         function blockActiveUser() {
-            showCustomConfirm('Block User', `Are you sure you want to block @${targetUsername}?`, async () => {
+            showProfileConfirm('Block User', `Are you sure you want to block @${targetUsername}?`, async () => {
                 let blockedList = [];
                 try {
                     blockedList = JSON.parse(localStorage.getItem(`chatlite_blocked_${currentUser.username}`) || '[]');
@@ -385,7 +442,7 @@
                     blockedList.push(targetUsername);
                     localStorage.setItem(`chatlite_blocked_${currentUser.username}`, JSON.stringify(blockedList));
                 }
-                showCustomAlert('Blocked', `Successfully blocked @${targetUsername}.`, () => {
+                showProfileAlert('Blocked', `Successfully blocked @${targetUsername}.`, () => {
                     window.location.href = 'chatlist.html';
                 });
             });
@@ -674,11 +731,63 @@
             let hiddenForMe = [];
             try { hiddenForMe = JSON.parse(localStorage.getItem(`chatlite_deleted_for_me_${currentUser.username}_${targetUsername}`) || '[]'); } catch(e) {}
             
-            selectedMessageIds.forEach(id => { if (!hiddenForMe.includes(id)) hiddenForMe.push(id); });
+            const idsToDelete = Array.from(selectedMessageIds);
+            idsToDelete.forEach(id => { if (!hiddenForMe.includes(id)) hiddenForMe.push(id); });
             localStorage.setItem(`chatlite_deleted_for_me_${currentUser.username}_${targetUsername}`, JSON.stringify(hiddenForMe));
             
             exitMultiSelectMode();
             renderMessages(messagesCache);
+            showUndoBanner(idsToDelete);
+        }
+
+        // --- 10 SECONDS UNDO DELETE LOGIC ---
+        function showUndoBanner(msgIds) {
+            if (pendingDeleteTimer) clearTimeout(pendingDeleteTimer);
+            if (undoCountdownInterval) clearInterval(undoCountdownInterval);
+
+            undoTargetMessage = msgIds;
+            const banner = document.getElementById('undo-banner');
+            const countdownEl = document.getElementById('undo-countdown');
+            let timeLeft = 10;
+            countdownEl.textContent = timeLeft;
+
+            banner.classList.remove('hidden');
+            banner.classList.add('flex');
+
+            undoCountdownInterval = setInterval(() => {
+                timeLeft--;
+                countdownEl.textContent = timeLeft;
+                if (timeLeft <= 0) {
+                    clearInterval(undoCountdownInterval);
+                }
+            }, 1000);
+
+            pendingDeleteTimer = setTimeout(() => {
+                hideUndoBanner();
+                undoTargetMessage = null;
+            }, 10000);
+        }
+
+        function hideUndoBanner() {
+            const banner = document.getElementById('undo-banner');
+            banner.classList.remove('flex');
+            banner.classList.add('hidden');
+            if (pendingDeleteTimer) clearTimeout(pendingDeleteTimer);
+            if (undoCountdownInterval) clearInterval(undoCountdownInterval);
+        }
+
+        function triggerUndoAction() {
+            if (!undoTargetMessage) return;
+            let hiddenForMe = [];
+            try { hiddenForMe = JSON.parse(localStorage.getItem(`chatlite_deleted_for_me_${currentUser.username}_${targetUsername}`) || '[]'); } catch(e) {}
+            
+            // Remove target IDs from hidden list
+            hiddenForMe = hiddenForMe.filter(id => !undoTargetMessage.includes(id));
+            localStorage.setItem(`chatlite_deleted_for_me_${currentUser.username}_${targetUsername}`, JSON.stringify(hiddenForMe));
+
+            hideUndoBanner();
+            renderMessages(messagesCache);
+            undoTargetMessage = null;
         }
 
         function openMessageOptions(msg) {
@@ -728,6 +837,7 @@
                 hiddenForMe.push(msg.id);
                 localStorage.setItem(`chatlite_deleted_for_me_${currentUser.username}_${targetUsername}`, JSON.stringify(hiddenForMe));
                 renderMessages(messagesCache);
+                showUndoBanner([msg.id]);
             };
             actionsContainer.appendChild(deleteForMeBtn);
 
