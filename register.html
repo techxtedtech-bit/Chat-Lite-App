@@ -11,7 +11,7 @@
 
     <div class="flex-1 flex flex-col w-full max-w-md mx-auto relative overflow-hidden shadow-2xl bg-slate-900 border-x border-slate-800 h-screen">
         
-        <!-- Background Image Container matching the welcome page style -->
+        <!-- Background Image Container -->
         <div class="absolute inset-0 bg-cover bg-center" style="background-image: url('image1-bg.jpg');">
             <div class="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/85 to-slate-950/60"></div>
         </div>
@@ -49,7 +49,7 @@
                         <label class="block text-xs font-medium text-slate-300 mb-1">Password</label>
                         <input type="password" id="reg-password" name="new_password_random" autocomplete="new-password" required class="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:border-orange-500 focus:bg-white/10 text-sm text-white backdrop-blur-md transition-all shadow-inner">
                     </div>
-                    <button type="submit" class="w-full py-3.5 bg-orange-600 hover:bg-orange-500 font-semibold rounded-xl shadow-lg shadow-orange-600/30 transition-all mt-4 cursor-pointer text-white">
+                    <button type="submit" id="submit-btn" class="w-full py-3.5 bg-orange-600 hover:bg-orange-500 font-semibold rounded-xl shadow-lg shadow-orange-600/30 transition-all mt-4 cursor-pointer text-white flex items-center justify-center">
                         Register Profile
                     </button>
                 </form>
@@ -60,7 +60,6 @@
 
     <script src="supabase.js"></script>
     <script>
-        // Helper to generate a random unique chat code ID
         function generateChatCode() {
             const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
             let code = 'CL-';
@@ -72,56 +71,79 @@
 
         async function handleRegister(e) {
             e.preventDefault();
+            
+            const submitBtn = document.getElementById('submit-btn');
             const name = document.getElementById('reg-name').value.trim();
             const gender = document.getElementById('reg-gender').value;
             const username = document.getElementById('reg-username').value.trim().toLowerCase();
             const password = document.getElementById('reg-password').value;
 
-            // Check if username already exists
-            const { data: existing } = await supabaseClient
-                .from('profiles')
-                .select('username')
-                .eq('username', username)
-                .maybeSingle();
-
-            if (existing) {
-                alert('Username is already taken. Please choose another.');
+            if (!name || !username || !password) {
+                alert('Please fill in all required fields.');
                 return;
             }
 
-            // Generate a unique chat code for the user
-            let chatCode = generateChatCode();
-            
-            // Ensure chat code uniqueness check loop (optional safety)
-            let isUnique = false;
-            let attempts = 0;
-            while (!isUnique && attempts < 5) {
-                const { data: codeCheck } = await supabaseClient
+            // Lock button & show loading state to prevent double-submits or freezing confusion
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Creating Profile...';
+
+            try {
+                // 1. Check if username already exists
+                const { data: existing, error: checkError } = await supabaseClient
                     .from('profiles')
-                    .select('chat_code')
-                    .eq('chat_code', chatCode)
+                    .select('username')
+                    .eq('username', username)
                     .maybeSingle();
-                
-                if (!codeCheck) {
-                    isUnique = true;
-                } else {
-                    chatCode = generateChatCode();
-                    attempts++;
+
+                if (checkError) {
+                    throw new Error('Database check failed: ' + checkError.message);
                 }
+
+                if (existing) {
+                    alert('Username is already taken. Please choose another.');
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Register Profile';
+                    return;
+                }
+
+                // 2. Generate a unique chat code for the user
+                let chatCode = generateChatCode();
+                let isUnique = false;
+                let attempts = 0;
+
+                while (!isUnique && attempts < 5) {
+                    const { data: codeCheck } = await supabaseClient
+                        .from('profiles')
+                        .select('chat_code')
+                        .eq('chat_code', chatCode)
+                        .maybeSingle();
+                    
+                    if (!codeCheck) {
+                        isUnique = true;
+                    } else {
+                        chatCode = generateChatCode();
+                        attempts++;
+                    }
+                }
+
+                // 3. Insert new profile into Supabase
+                const { error: insertError } = await supabaseClient
+                    .from('profiles')
+                    .insert([{ name, gender, username, password, chat_code: chatCode }]);
+
+                if (insertError) {
+                    throw new Error(insertError.message);
+                }
+
+                alert(`Profile created successfully!\n\nYour Unique Chat Code is: ${chatCode}\nSave this or use it to sign in.`);
+                window.location.href = 'index.html';
+
+            } catch (err) {
+                console.error('Registration exception:', err);
+                alert('Error creating profile: ' + (err.message || 'Network connection or database issue occurred.'));
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Register Profile';
             }
-
-            // Insert new profile with the generated chat code
-            const { error } = await supabaseClient
-                .from('profiles')
-                .insert([{ name, gender, username, password, chat_code: chatCode }]);
-
-            if (error) {
-                alert('Error creating profile: ' + error.message);
-                return;
-            }
-
-            alert(`Profile created successfully!\n\nYour Unique Chat Code is: ${chatCode}\nSave this or use it to sign in.`);
-            window.location.href = 'index.html';
         }
     </script>
 </body>
