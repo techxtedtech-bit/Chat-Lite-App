@@ -565,14 +565,14 @@
             let pressTimer = null;
             const startPress = (e) => {
                 if (msg.is_offline_pending) return; 
-                // Adjusted down to 1200ms (1.2 seconds) as requested
+                // Reduced press down timer to 500 milliseconds as requested
                 pressTimer = setTimeout(() => {
                     if (isMultiSelectMode) {
                         if (msg.id) toggleMessageSelection(msg.id);
                     } else {
                         openMessageOptions(msg);
                     }
-                }, 1200);
+                }, 500);
             };
             const cancelPress = () => { if (pressTimer) clearTimeout(pressTimer); };
 
@@ -642,7 +642,13 @@
             });
 
             const bubble = document.createElement('div');
-            bubble.className = `flex-1 px-3 py-2 rounded-2xl text-sm ${isMe ? 'bg-indigo-600 text-white rounded-br-none' : 'bg-slate-800 text-slate-100 rounded-bl-none border border-slate-700/50'}`;
+            
+            if (msg.message_type === 'audio') {
+                // Glassy transparent feel voice note style matching the reference image screenshot
+                bubble.className = `flex-1 px-3 py-2.5 rounded-2xl text-sm ${isMe ? 'bg-orange-600/90 text-white rounded-br-none shadow-lg' : 'bg-slate-800/80 text-slate-100 rounded-bl-none border border-white/10 backdrop-blur-md'}`;
+            } else {
+                bubble.className = `flex-1 px-3 py-2 rounded-2xl text-sm ${isMe ? 'bg-indigo-600 text-white rounded-br-none' : 'bg-slate-800 text-slate-100 rounded-bl-none border border-slate-700/50'}`;
+            }
 
             if (msg.reply_to) {
                 const replySnippet = document.createElement('div');
@@ -659,24 +665,19 @@
             } else if (type === 'video') {
                 contentBody.innerHTML = `<video src="${msg.content}" controls class="rounded-xl max-h-60 w-full"></video>`;
             } else if (type === 'audio') {
-                // --- REDESIGNED COMPACT VOICE NOTE PLAYER WITH REWIND, FAST FORWARD & SPEED CONTROLS ---
+                // --- GLASSY TRANSPARENT VOICE NOTE PLAYER MATCHING REFERENCE IMAGE ---
                 const audioId = `audio_elem_${Math.random().toString(36).substring(2, 9)}`;
                 contentBody.innerHTML = `
-                    <div class="flex flex-col gap-1.5 py-1 px-2 bg-slate-950/60 rounded-xl border border-white/10 w-[240px]">
-                        <div class="flex items-center gap-2">
-                            <button type="button" onclick="toggleAudioPlayback('${audioId}', this)" class="w-7 h-7 rounded-full bg-indigo-500 hover:bg-indigo-600 text-white flex items-center justify-center text-[11px] font-bold shadow transition-transform cursor-pointer flex-shrink-0">▶</button>
-                            <button type="button" onclick="skipAudioTime('${audioId}', -5)" class="text-[10px] text-slate-300 hover:text-white px-1.5 py-0.5 bg-slate-800/80 rounded cursor-pointer" title="Rewind 5 seconds">-5s</button>
+                    <div class="flex flex-col gap-2 py-1 px-1 w-[240px]">
+                        <div class="flex items-center gap-2.5">
+                            <button type="button" onclick="toggleAudioPlayback('${audioId}', this)" class="w-8 h-8 rounded-full bg-white/30 hover:bg-white/40 text-white flex items-center justify-center text-xs font-bold shadow backdrop-blur-sm transition-transform cursor-pointer flex-shrink-0">▶</button>
+                            <span id="current_${audioId}" class="text-[11px] text-white/90 font-mono w-8">0:00</span>
                             <div class="flex-1 flex flex-col justify-center overflow-hidden cursor-pointer" onclick="seekAudioBar(event, '${audioId}')">
-                                <div class="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden relative">
-                                    <div id="progress_${audioId}" class="bg-indigo-400 h-full w-0 transition-all"></div>
+                                <div class="w-full bg-white/20 h-1.5 rounded-full overflow-hidden relative">
+                                    <div id="progress_${audioId}" class="bg-white h-full w-0 transition-all"></div>
                                 </div>
                             </div>
-                            <button type="button" onclick="skipAudioTime('${audioId}', 5)" class="text-[10px] text-slate-300 hover:text-white px-1.5 py-0.5 bg-slate-800/80 rounded cursor-pointer" title="Fast Forward 5 seconds">+5s</button>
-                            <button type="button" onclick="cycleAudioSpeed('${audioId}', this)" class="text-[10px] font-bold text-indigo-300 hover:text-white px-1.5 py-0.5 bg-slate-800 rounded cursor-pointer w-7 text-center" id="speed_${audioId}">1x</button>
-                        </div>
-                        <div class="flex justify-between items-center text-[9px] text-slate-400 font-mono px-1">
-                            <span id="current_${audioId}">0:00</span>
-                            <span id="duration_${audioId}">--:--</span>
+                            <button type="button" onclick="cycleAudioSpeed('${audioId}', this)" class="text-[10px] font-bold text-white px-2 py-1 bg-white/20 hover:bg-white/30 rounded-lg backdrop-blur-sm cursor-pointer w-8 text-center" id="speed_${audioId}">1x</button>
                         </div>
                         <audio id="${audioId}" src="${msg.content}" preload="metadata" onloadedmetadata="initAudioMetadata('${audioId}')" ontimeupdate="updateAudioProgress('${audioId}')" onended="resetAudioPlayer('${audioId}')" class="hidden"></audio>
                     </div>
