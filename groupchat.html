@@ -41,6 +41,11 @@
             <button onclick="toggleSearchBox()" class="text-slate-400 hover:text-white text-xs px-2 py-1 bg-slate-800 rounded-lg cursor-pointer">Close</button>
         </div>
 
+        <!-- Typing Indicator Banner -->
+        <div id="typing-indicator-bar" class="hidden px-3 py-1 bg-slate-950/80 border-b border-slate-800/60 text-[10px] text-orange-400 italic z-15 flex-shrink-0">
+            <!-- Populated dynamically -->
+        </div>
+
         <!-- Messages Area (Scrollable independently underneath header) -->
         <div id="chat-messages" class="flex-1 min-h-0 overflow-y-auto p-4 space-y-3 bg-slate-950 flex flex-col">
             <div class="text-center text-xs text-slate-500 py-4">Loading group messages...</div>
@@ -52,9 +57,17 @@
             <button type="button" onclick="triggerUndoAction()" class="px-3 py-1 bg-orange-600 hover:bg-orange-500 text-white text-xs font-bold rounded-lg cursor-pointer">Undo (<span id="undo-countdown">10</span>s)</button>
         </div>
 
-        <!-- Message Options Popup Modal (Long Press Menu) -->
+        <!-- Message Options Popup Modal (Long Press Menu + Quick Reactions) -->
         <div id="message-options-modal" class="hidden absolute inset-0 bg-slate-950/70 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
-            <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-xs p-3 shadow-2xl flex flex-col gap-2">
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-xs p-3 shadow-2xl flex flex-col gap-3">
+                <!-- Quick Reactions Bar Inside Modal -->
+                <div class="flex items-center justify-around bg-slate-950 p-2 rounded-xl border border-slate-800 text-lg">
+                    <button onclick="sendQuickReaction('❤️')" class="hover:scale-125 transition-transform cursor-pointer">❤️</button>
+                    <button onclick="sendQuickReaction('👍')" class="hover:scale-125 transition-transform cursor-pointer">👍</button>
+                    <button onclick="sendQuickReaction('😂')" class="hover:scale-125 transition-transform cursor-pointer">😂</button>
+                    <button onclick="sendQuickReaction('🔥')" class="hover:scale-125 transition-transform cursor-pointer">🔥</button>
+                    <button onclick="sendQuickReaction('👏')" class="hover:scale-125 transition-transform cursor-pointer">👏</button>
+                </div>
                 <div class="text-xs font-bold text-slate-400 pb-2 border-b border-slate-800 flex justify-between items-center">
                     <span>Message Options</span>
                     <button onclick="closeMessageOptions()" class="text-slate-400 hover:text-white text-base cursor-pointer">&times;</button>
@@ -125,8 +138,8 @@
                 +
             </button>
             
-            <!-- Standard Text Input -->
-            <input type="text" id="message-input" placeholder="Type a message..." class="flex-1 px-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl focus:outline-none focus:border-orange-500 text-sm text-white min-w-0">
+            <!-- Standard Text Input with Typing Broadcast Trigger -->
+            <input type="text" id="message-input" placeholder="Type a message..." oninput="handleTypingInput()" class="flex-1 px-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl focus:outline-none focus:border-orange-500 text-sm text-white min-w-0">
             
             <!-- Live Recording Indicator & Controls UI (Hidden by default) -->
             <div id="recording-ui" class="hidden flex-1 items-center justify-between px-3 py-2 bg-slate-950 border border-red-500/50 rounded-xl min-w-0">
@@ -225,12 +238,17 @@
         let recordingTimerInterval = null;
         let recordingSeconds = 0;
         let activeReplyMessage = null;
+        let activeSelectedMessage = null;
+
+        // Realtime channels & typing indicators
+        let groupChannel = null;
+        let typingTimeout = null;
+        let activeTypingUsers = new Set();
 
         const GROUP_STORAGE_KEY = `chatlite_group_cache_${currentUser?.username}_${groupId}`;
         const GROUP_QUEUE_KEY = `chatlite_group_offline_queue_${currentUser?.username}_${groupId}`;
 
         let messagesCache = loadLocalGroupCache();
-        let messageSubscription = null;
 
         // Undo & Deletion management variables
         let pendingDeleteTimer = null;
@@ -323,7 +341,7 @@
 
             await checkUserRoleAndLoadMembers();
             await fetchGroupMessages();
-            subscribeToGroupMessages();
+            setupRealtimeChannel();
         }
 
         async function checkUserRoleAndLoadMembers() {
@@ -517,6 +535,34 @@
 
             alert('Role updated successfully.');
             checkUserRoleAndLoadMembers();
+        }
+
+        // --- TYPING BROADCAST ---
+        function handleTypingInput() {
+            if (!groupChannel) return;
+            groupChannel.send({
+                type: 'broadcast',
+                event: 'typing',
+                payload: { username: currentUser.username, name: currentUser.name }
+            });
+
+            if (typingTimeout) clearTimeout(typingTimeout);
+            typingTimeout = setTimeout(() => {
+                // idle
+            }, 3000);
+        }
+
+        function updateTypingIndicatorDisplay() {
+            const bar = document.getElementById('typing-indicator-bar');
+            if (activeTypingUsers.size === 0) {
+                bar.classList.add('hidden');
+                bar.classList.remove('flex');
+            } else {
+                const names = Array.from(activeTypingUsers).join(', ');
+                bar.textContent = `${names} ${activeTypingUsers.size === 1 ? 'is' : 'are'} typing...`;
+                bar.classList.remove('hidden');
+                bar.classList.add('flex');
+            }
         }
 
         // --- STAGING FILES & MEDIA ---
@@ -884,7 +930,6 @@
                 return;
             }
 
-            // Date Divider Grouping Logic
             let lastDateLabel = null;
 
             filtered.forEach(msg => {
@@ -921,11 +966,10 @@
             bubble.className = `flex flex-col ${isMe ? 'items-end' : 'items-start'} mb-2 relative select-none`;
             if (msg.id) bubble.setAttribute('data-id', msg.id);
 
-            // --- Long press detection (600 milliseconds requirement + blocking default context/selection menus) ---
             let pressTimer = null;
             const startPress = (e) => {
                 if (pressTimer) clearTimeout(pressTimer);
-                pressTimer = setTimeout(() => openMessageOptions(msg), 600); // 600ms duration
+                pressTimer = setTimeout(() => openMessageOptions(msg), 600);
             };
             const cancelPress = (e) => {
                 if (pressTimer) {
@@ -937,12 +981,11 @@
             bubble.addEventListener('touchstart', startPress, { passive: true });
             bubble.addEventListener('touchend', cancelPress);
             bubble.addEventListener('touchmove', cancelPress);
-            bubble.addEventListener('contextmenu', (e) => e.preventDefault()); // Block standard right-click context menu
+            bubble.addEventListener('contextmenu', (e) => e.preventDefault());
             bubble.addEventListener('mousedown', startPress);
             bubble.addEventListener('mouseup', cancelPress);
             bubble.addEventListener('mouseleave', cancelPress);
 
-            // --- Swipe to reply implementation ---
             let touchStartX = 0;
             bubble.addEventListener('touchstart', (e) => {
                 touchStartX = e.touches[0].clientX;
@@ -1018,6 +1061,18 @@
                 contentHtml = `<span>${escapeHtml(msg.message)}</span>`;
             }
 
+            let reactionsHtml = '';
+            if (msg.reactions && typeof msg.reactions === 'object') {
+                const entries = Object.entries(msg.reactions);
+                if (entries.length > 0) {
+                    reactionsHtml = `<div class="flex items-center gap-1 mt-1 flex-wrap">`;
+                    entries.forEach(([emoji, users]) => {
+                        reactionsHtml += `<span class="bg-slate-800 border border-slate-700 text-[10px] px-1.5 py-0.5 rounded-full flex items-center gap-1">${emoji} <span class="font-bold text-orange-400">${users.length}</span></span>`;
+                    });
+                    reactionsHtml += `</div>`;
+                }
+            }
+
             const metaRow = document.createElement('div');
             metaRow.className = 'flex items-center gap-1 px-1 text-[9px] text-slate-500 mt-0.5';
             
@@ -1045,6 +1100,7 @@
                     ${replyQuoteHtml}
                     ${contentHtml}
                 </div>
+                ${reactionsHtml}
             `;
             bubble.appendChild(metaRow);
             chatContainer.appendChild(bubble);
@@ -1054,8 +1110,9 @@
             }
         }
 
-        // --- MESSAGE DELETE & OPTIONS LOGIC ---
+        // --- MESSAGE DELETE & OPTIONS & QUICK REACTIONS ---
         function openMessageOptions(msg) {
+            activeSelectedMessage = msg;
             const modal = document.getElementById('message-options-modal');
             const actionsContainer = document.getElementById('message-options-actions');
             actionsContainer.innerHTML = '';
@@ -1068,7 +1125,6 @@
             const diffHours = (now - msgTime) / (1000 * 60 * 60);
             const within3Hours = diffHours <= 3;
 
-            // Reply option
             const replyBtn = document.createElement('button');
             replyBtn.className = 'w-full text-left px-3 py-2 text-xs font-medium text-slate-200 hover:bg-slate-800 rounded-xl transition-all cursor-pointer';
             replyBtn.textContent = '↩️ Reply';
@@ -1078,7 +1134,6 @@
             };
             actionsContainer.appendChild(replyBtn);
 
-            // Copy option
             const copyBtn = document.createElement('button');
             copyBtn.className = 'w-full text-left px-3 py-2 text-xs font-medium text-slate-200 hover:bg-slate-800 rounded-xl transition-all cursor-pointer';
             copyBtn.textContent = '📋 Copy';
@@ -1089,7 +1144,6 @@
             };
             actionsContainer.appendChild(copyBtn);
 
-            // Forward option
             const forwardBtn = document.createElement('button');
             forwardBtn.className = 'w-full text-left px-3 py-2 text-xs font-medium text-slate-200 hover:bg-slate-800 rounded-xl transition-all cursor-pointer';
             forwardBtn.textContent = '↗️ Forward';
@@ -1099,7 +1153,6 @@
             };
             actionsContainer.appendChild(forwardBtn);
 
-            // Delete for me
             const deleteForMeBtn = document.createElement('button');
             deleteForMeBtn.className = 'w-full text-left px-3 py-2 text-xs font-medium text-slate-200 hover:bg-slate-800 rounded-xl transition-all cursor-pointer';
             deleteForMeBtn.textContent = '🗑️ Delete for me';
@@ -1122,6 +1175,31 @@
 
             modal.classList.remove('hidden');
             modal.classList.add('flex');
+        }
+
+        async function sendQuickReaction(emoji) {
+            if (!activeSelectedMessage || !dbClient) return;
+            closeMessageOptions();
+
+            let reactions = activeSelectedMessage.reactions || {};
+            if (!reactions[emoji]) reactions[emoji] = [];
+            
+            if (!reactions[emoji].includes(currentUser.username)) {
+                reactions[emoji].push(currentUser.username);
+            } else {
+                reactions[emoji] = reactions[emoji].filter(u => u !== currentUser.username);
+                if (reactions[emoji].length === 0) delete reactions[emoji];
+            }
+
+            const { error } = await dbClient
+                .from('group_messages')
+                .update({ reactions: reactions })
+                .eq('id', activeSelectedMessage.id);
+
+            if (!error) {
+                activeSelectedMessage.reactions = reactions;
+                renderMessages(messagesCache);
+            }
         }
 
         function closeMessageOptions() {
@@ -1282,12 +1360,26 @@
             document.getElementById('media-gallery-modal').classList.add('hidden');
         }
 
-        function subscribeToGroupMessages() {
+        // --- REALTIME SUBSCRIPTIONS & BROADCASTS ---
+        function setupRealtimeChannel() {
             if (!navigator.onLine || !dbClient) return;
-            messageSubscription = dbClient
-                .channel('public:group_messages')
+
+            groupChannel = dbClient.channel(`room_${groupId}`);
+
+            groupChannel
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'group_messages', filter: `group_id=eq.${groupId}` }, payload => {
                     fetchGroupMessages();
+                })
+                .on('broadcast', { event: 'typing' }, payload => {
+                    const { username, name } = payload.payload;
+                    if (username === currentUser.username) return;
+                    activeTypingUsers.add(name || username);
+                    updateTypingIndicatorDisplay();
+
+                    setTimeout(() => {
+                        activeTypingUsers.delete(name || username);
+                        updateTypingIndicatorDisplay();
+                    }, 3000);
                 })
                 .subscribe();
         }
