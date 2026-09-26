@@ -4,15 +4,36 @@ const SUPABASE_ANON_KEY = 'sb_publishable_swbZv75BIDV5J8tp6KrO2A_rbhE3_sj';
 
 let supabaseClient = null;
 try {
-    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+        auth: {
+            persistSession: true,
+            storage: window.localStorage,
+            autoRefreshToken: true,
+            detectSessionInUrl: true
+        }
+    });
 } catch (err) {
     console.error('Supabase initialization error:', err);
 }
 
 // --- APP STATE ---
-let currentUser = null;
+let currentUser = JSON.parse(localStorage.getItem('chatlite_persistent_user')) || null;
 let activeChatUser = null;
 let messageSubscription = null;
+
+// --- AUTO-RESUME SESSION ON LOAD ---
+document.addEventListener('DOMContentLoaded', () => {
+    if (currentUser) {
+        const displayEl = document.getElementById('current-user-display');  
+        if (displayEl) {  
+            displayEl.textContent = `${currentUser.name} (@${currentUser.username})`;  
+        }  
+        loadChatList();  
+        switchView('view-chatlist');
+    } else {
+        switchView('view-welcome');
+    }
+});
 
 // --- VIEW NAVIGATION CONTROLLER ---
 function switchView(viewId) {
@@ -115,6 +136,7 @@ async function handleLogin(e) {
     }  
 
     currentUser = data;  
+    localStorage.setItem('chatlite_persistent_user', JSON.stringify(currentUser));
     closeLoginModal();  
       
     const displayEl = document.getElementById('current-user-display');  
@@ -129,6 +151,7 @@ async function handleLogin(e) {
 function handleLogout() {
     currentUser = null;
     activeChatUser = null;
+    localStorage.removeItem('chatlite_persistent_user');
     if (messageSubscription && supabaseClient) {
         supabaseClient.removeChannel(messageSubscription);
     }

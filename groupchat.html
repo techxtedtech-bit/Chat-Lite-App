@@ -197,6 +197,15 @@
 
     <script src="supabase.js"></script>
     <script>
+        // --- SERVICE WORKER REGISTRATION ---
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(reg => console.log('Service Worker registered successfully:', reg.scope))
+                    .catch(err => console.error('Service Worker registration failed:', err));
+            });
+        }
+
         const dbClient = typeof supabaseClient !== 'undefined' ? supabaseClient : (typeof supabase !== 'undefined' ? supabase : null);
         const urlParams = new URLSearchParams(window.location.search);
         const groupId = urlParams.get('id');
@@ -758,11 +767,6 @@
             renderMessages(messagesCache);
             cancelReply();
 
-            if (!navigator.onLine) {
-                queueGroupOfflineMessage(localMessage);
-                return;
-            }
-
             const payload = {
                 group_id: groupId,
                 sender_username: currentUser.username,
@@ -773,12 +777,19 @@
                 ...replyData
             };
 
+            if (!navigator.onLine) {
+                queueGroupOfflineMessage(localMessage);
+                registerBackgroundSync();
+                return;
+            }
+
             const { error } = await dbClient
                 .from('group_messages')
                 .insert([payload]);
 
             if (error) {
                 queueGroupOfflineMessage(localMessage);
+                registerBackgroundSync();
             } else {
                 messagesCache = messagesCache.filter(m => m !== localMessage);
                 saveLocalGroupCache(messagesCache);
@@ -790,6 +801,17 @@
             const queue = getGroupOfflineQueue();
             queue.push(msg);
             saveGroupOfflineQueue(queue);
+        }
+
+        async function registerBackgroundSync() {
+            if ('serviceWorker' in navigator && 'SyncManager' in window) {
+                try {
+                    const reg = await navigator.serviceWorker.ready;
+                    await reg.sync.register('sync-group-messages');
+                } catch (err) {
+                    console.error('Background sync registration failed:', err);
+                }
+            }
         }
 
         window.addEventListener('online', async () => {

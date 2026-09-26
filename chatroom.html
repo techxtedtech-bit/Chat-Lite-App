@@ -189,6 +189,15 @@
 
     <script src="supabase.js"></script>
     <script>
+        // Register Service Worker
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(reg => console.log('ServiceWorker registered successfully:', reg.scope))
+                    .catch(err => console.log('ServiceWorker registration failed:', err));
+            });
+        }
+
         const currentUser = JSON.parse(localStorage.getItem('chatlite_user'));
         const urlParams = new URLSearchParams(window.location.search);
         const targetUsername = urlParams.get('to');
@@ -743,6 +752,13 @@
                 queue.push({ ...payload, is_offline_pending: true });
                 saveOfflineQueue(queue);
                 renderMessages(messagesCache);
+                
+                // Trigger background sync if supported
+                if ('serviceWorker' in navigator && 'SyncManager' in window) {
+                    navigator.serviceWorker.ready.then(swRegistration => {
+                        return swRegistration.sync.register('sync-messages');
+                    }).catch(err => console.log('Background sync registration failed:', err));
+                }
                 return;
             }
 
