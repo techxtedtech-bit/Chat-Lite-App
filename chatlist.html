@@ -138,6 +138,7 @@
 
             initHeaderProfile();
             loadConnectionsAndChats();
+            setupRealtimeSubscriptions();
 
             // Handle forwarded payload if redirected from chatroom
             const urlParams = new URLSearchParams(window.location.search);
@@ -149,8 +150,36 @@
                 }
             }
 
-            // Refresh list periodically without resetting UI state
-            setInterval(() => loadConnectionsAndChats(true), 5000);
+            // Fallback periodic refresh
+            setInterval(() => loadConnectionsAndChats(true), 10000);
+        }
+
+
+        /* ==========================================
+           REALTIME SUBSCRIPTIONS
+        ========================================== */
+
+        function setupRealtimeSubscriptions() {
+            if (!currentUser || !currentUser.username) return;
+
+            // Listen to new private messages
+            supabaseClient
+                .channel('public:messages')
+                .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, payload => {
+                    const msg = payload.new;
+                    if (msg.sender_username === currentUser.username || msg.receiver_username === currentUser.username) {
+                        loadConnectionsAndChats(true);
+                    }
+                })
+                .subscribe();
+
+            // Listen to new group messages
+            supabaseClient
+                .channel('public:group_messages')
+                .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'group_messages' }, () => {
+                    loadConnectionsAndChats(true);
+                })
+                .subscribe();
         }
 
 
@@ -505,16 +534,7 @@
                         `;
 
 
-                        const joinedBadge = document.createElement('span');
-
-                        joinedBadge.className =
-                            'text-[10px] text-orange-400 bg-orange-950/30 px-2 py-1 rounded border border-orange-900/40 font-semibold uppercase ml-2';
-
-                        joinedBadge.textContent = 'Joined';
-
-
                         item.appendChild(groupOpenArea);
-                        item.appendChild(joinedBadge);
                     }
 
 
