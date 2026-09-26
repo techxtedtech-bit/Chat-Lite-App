@@ -84,6 +84,33 @@
                     </button>
                 </form>
 
+                <!-- Data & Account Management Section -->
+                <div class="mt-8 pt-6 border-t border-slate-800 space-y-3">
+                    <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">Data & Account Privacy</span>
+                    
+                    <!-- Export Chats -->
+                    <div class="p-4 bg-slate-950 border border-slate-800 rounded-2xl flex items-center justify-between">
+                        <div>
+                            <span class="text-sm font-semibold text-white block">Export Chat Backup</span>
+                            <span class="text-xs text-slate-400 mt-0.5 block">Download local chat archives as JSON</span>
+                        </div>
+                        <button type="button" onclick="exportChatBackup()" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 px-3.5 py-2 rounded-xl transition-all cursor-pointer font-medium">
+                            Export
+                        </button>
+                    </div>
+
+                    <!-- Delete Account -->
+                    <div class="p-4 bg-red-950/10 border border-red-900/30 rounded-2xl flex items-center justify-between">
+                        <div>
+                            <span class="text-sm font-semibold text-red-400 block">Delete Account</span>
+                            <span class="text-xs text-slate-400 mt-0.5 block">Permanently remove profile & data</span>
+                        </div>
+                        <button type="button" onclick="openDeleteModal()" class="text-xs bg-red-600/20 border border-red-500/30 hover:bg-red-600/30 text-red-400 px-3.5 py-2 rounded-xl font-semibold transition-all cursor-pointer">
+                            Delete
+                        </button>
+                    </div>
+                </div>
+
             </div>
 
         </div>
@@ -100,6 +127,20 @@
             <div class="flex items-center gap-3 pt-2">
                 <button type="button" onclick="closeCodeModal()" class="flex-1 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold rounded-xl text-xs transition-all cursor-pointer">Cancel</button>
                 <button type="button" onclick="generateAndSaveChatCode()" class="flex-1 py-2.5 bg-orange-600 hover:bg-orange-500 text-white font-semibold rounded-xl text-xs shadow-lg shadow-orange-600/20 transition-all cursor-pointer">Yes, Generate</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- DELETE ACCOUNT CONFIRMATION MODAL -->
+    <div id="delete-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md hidden items-center justify-center p-4 z-50">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-sm p-6 space-y-4 shadow-2xl">
+            <h3 class="text-base font-bold text-red-400">Permanently Delete Account?</h3>
+            <p class="text-xs text-slate-400 leading-relaxed">
+                This action is irreversible. All your profile data, chat codes, and saved preferences will be completely removed from the platform.
+            </p>
+            <div class="flex items-center gap-3 pt-2">
+                <button type="button" onclick="closeDeleteModal()" class="flex-1 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold rounded-xl text-xs transition-all cursor-pointer">Cancel</button>
+                <button type="button" onclick="confirmDeleteAccount()" class="flex-1 py-2.5 bg-red-600 hover:bg-red-500 text-white font-semibold rounded-xl text-xs shadow-lg shadow-red-600/20 transition-all cursor-pointer">Yes, Delete</button>
             </div>
         </div>
     </div>
@@ -289,6 +330,70 @@
 
             alert('Profile updated successfully!');
             window.location.href = 'chatlist.html';
+        }
+
+        // --- EXPORT CHAT BACKUP FEATURE ---
+        function exportChatBackup() {
+            const backupData = {};
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                // Collect chat, message, or chatlite related localStorage items
+                if (key.includes('chat') || key.includes('msg') || key.includes('message') || key.includes('chatlite')) {
+                    try {
+                        backupData[key] = JSON.parse(localStorage.getItem(key));
+                    } catch (e) {
+                        backupData[key] = localStorage.getItem(key);
+                    }
+                }
+            }
+
+            if (Object.keys(backupData).length === 0) {
+                alert('No local chat history found to export.');
+                return;
+            }
+
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backupData, null, 2));
+            const downloadAnchor = document.createElement('a');
+            downloadAnchor.setAttribute("href", dataStr);
+            downloadAnchor.setAttribute("download", `chatlite_backup_${currentUser.username}_${new Date().toISOString().slice(0, 10)}.json`);
+            document.body.appendChild(downloadAnchor);
+            downloadAnchor.click();
+            downloadAnchor.remove();
+        }
+
+        // --- ACCOUNT DELETION MODAL & LOGIC ---
+        function openDeleteModal() {
+            document.getElementById('delete-modal').classList.remove('hidden');
+            document.getElementById('delete-modal').classList.add('flex');
+        }
+
+        function closeDeleteModal() {
+            document.getElementById('delete-modal').classList.remove('flex');
+            document.getElementById('delete-modal').classList.add('hidden');
+        }
+
+        async function confirmDeleteAccount() {
+            closeDeleteModal();
+            if (!dbClient) {
+                alert('Database client not initialized.');
+                return;
+            }
+
+            // Remove profile row from Supabase
+            const { error } = await dbClient
+                .from('profiles')
+                .delete()
+                .eq('username', currentUser.username);
+
+            if (error) {
+                alert('Error deleting account: ' + error.message);
+                return;
+            }
+
+            // Clear local storage session
+            localStorage.clear();
+            alert('Your account has been permanently deleted.');
+            window.location.href = 'index.html';
         }
     </script>
 </body>
