@@ -1077,7 +1077,6 @@
 
             const { data, error } = await supabaseClient.from('messages').insert([payload]).select();
             if (!error && data && data.length > 0) {
-                // Instantly append to local cache and render to prevent waiting on network echo delay
                 if (!messagesCache.some(m => m.id === data[0].id)) {
                     messagesCache.push(data[0]);
                     saveLocalCache(messagesCache);
@@ -1299,8 +1298,14 @@
             document.getElementById('media-gallery-modal').classList.add('hidden');
         }
 
+        // Initial fetch, realtime subscription, and heartbeat polling setup
         fetchMessages();
         subscribeToRealtimeChannels();
+
+        // Fallback periodic sync loop every 5 seconds to ensure drops even if webhooks fail
+        setInterval(() => {
+            fetchMessages();
+        }, 5000);
     </script>
 </body>
 </html>
