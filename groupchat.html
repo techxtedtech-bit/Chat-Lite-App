@@ -1368,29 +1368,50 @@
         function setupRealtimeChannel() {
             if (!navigator.onLine || !dbClient) return;
 
-            // Updated to bind uniquely to the room/group ID and listen explicitly via group_id filter
-            groupChannel = dbClient.channel(`room_${groupId}`);
+            // Remove existing channel if active to prevent duplicated subscriptions
+            if (groupChannel) {
+                dbClient.removeChannel(groupChannel);
+            }
+
+            // Bind uniquely to the specific group room using the table row-filtering format
+            groupChannel = dbClient.channel(`public:group_messages:group_id=eq.${groupId}`);
 
             groupChannel
                 .on(
                     'postgres_changes', 
                     { 
-                        event: '*', 
+                        event: 'INSERT', 
                         schema: 'public', 
                         table: 'group_messages', 
                         filter: `group_id=eq.${groupId}` 
                     }, 
                     payload => {
-                        if (payload.eventType === 'INSERT') {
-                            const newMsg = payload.new;
-                            if (!messagesCache.some(m => m.id === newMsg.id)) {
-                                messagesCache.push(newMsg);
-                                saveLocalGroupCache(messagesCache);
-                                renderMessages(messagesCache);
-                            }
-                        } else {
-                            fetchGroupMessages();
+                        const newMsg = payload.new;
+                        if (newMsg && !messagesCache.some(m => m.id === newMsg.id)) {
+                            messagesCache.push(newMsg);
+                            saveLocalGroupCache(messagesCache);
+                            renderMessages(messagesCache);
                         }
+                    }
+                )
+                .on(
+                    'postgres_changes', 
+                    { 
+                        event: 'UPDATE', 
+                        schema: 'public', 
+                        table: 'group_messages', 
+                        filter: `group_id=eq.${groupId}` 
+                    }, 
+                    payload => {
+                        const updatedMsg = payload.new;
+                        const index = messagesCache.findIndex(m => m.id === updatedMsg.id);
+                        if (index !== -1) {
+                            messagesCache[index] = updatedMsg;
+                        } else {
+                            messagesCache.push(updatedMsg);
+                        }
+                        saveLocalGroupCache(messagesCache);
+                        renderMessages(messagesCache);
                     }
                 )
                 .on('broadcast', { event: 'typing' }, payload => {
@@ -1404,7 +1425,11 @@
                         updateTypingIndicatorDisplay();
                     }, 3000);
                 })
-                .subscribe();
+                .subscribe((status) => {
+                    if (status === 'SUBSCRIBED') {
+                        console.log('Successfully subscribed to group channel:', groupId);
+                    }
+                });
         }
 
         function escapeHtml(text) {
