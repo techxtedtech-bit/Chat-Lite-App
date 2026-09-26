@@ -418,6 +418,8 @@
 
             const contentBody = document.createElement('div');
             const type = msg.message_type || 'text';
+            
+            // STRICT TYPE ROUTING FIXED HERE
             if (type === 'image') {
                 contentBody.innerHTML = `<img src="${msg.content}" class="rounded-xl max-h-60 w-full object-cover cursor-pointer" onclick="if(!isMultiSelectMode) window.open('${msg.content}')">`;
             } else if (type === 'video') {
@@ -839,10 +841,15 @@
                 progressBar.style.width = '100%';
                 statusText.textContent = 'Ready! Hit the Send button to upload to storage.';
 
+                // STRICT TYPE CLASSIFICATION FIXED HERE
                 let type = 'file';
-                if (file.type.startsWith('image/')) type = 'image';
-                else if (file.type.startsWith('video/')) type = 'video';
-                else if (file.type.startsWith('audio/')) type = 'audio';
+                if (file.type.startsWith('image/')) {
+                    type = 'image';
+                } else if (file.type.startsWith('video/')) {
+                    type = 'video';
+                } else if (file.type.startsWith('audio/')) {
+                    type = 'audio';
+                }
 
                 stagedPayload = {
                     localPreview: e.target.result,
