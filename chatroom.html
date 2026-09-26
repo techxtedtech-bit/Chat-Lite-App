@@ -175,7 +175,7 @@
         let messagesCache = loadLocalCache();
         let mediaRecorder = null;
         let audioChunks = [];
-        let recordedBlob = null;
+        let recordedFileStaged = null;
         let stagedPayload = null; 
         let isRecording = false;
         let isPaused = false;
@@ -344,7 +344,6 @@
                     if (isMultiSelectMode) {
                         if (msg.id) toggleMessageSelection(msg.id);
                     } else {
-                        // Long press opens individual options (reply, copy, forward, delete)
                         openMessageOptions(msg);
                     }
                 }, 600);
@@ -461,7 +460,7 @@
                 }, 50);
 
             } else if (type === 'file') {
-                contentBody.innerHTML = `<a href="${msg.content}" download="file" class="flex items-center gap-2 underline text-xs font-semibold py-1">📁 File Attachment</a>`;
+                contentBody.innerHTML = `<a href="${msg.content}" target="_blank" download class="flex items-center gap-2 underline text-xs font-semibold py-1">📁 Download File Attachment</a>`;
             } else {
                 contentBody.textContent = msg.content;
             }
@@ -825,25 +824,20 @@
             const file = event.target.files[0];
             if (!file) return;
 
+            recordedFileStaged = file; // Hold raw file reference for bucket upload
+
             const reader = new FileReader();
             const progressBar = document.getElementById('upload-progress-bar');
             const statusText = document.getElementById('upload-status-text');
             document.getElementById('media-preview-bar').classList.remove('hidden');
             document.getElementById('media-preview-bar').classList.add('flex');
             
-            progressBar.style.width = '10%';
-            statusText.textContent = 'Reading file stream...';
-
-            reader.onprogress = (data) => {
-                if (data.lengthComputable) {
-                    const percent = Math.round((data.loaded / data.total) * 90);
-                    progressBar.style.width = percent + '%';
-                }
-            };
+            progressBar.style.width = '20%';
+            statusText.textContent = 'Staging file...';
 
             reader.onload = function(e) {
                 progressBar.style.width = '100%';
-                statusText.textContent = 'Ready! Hit the Send button to dispatch.';
+                statusText.textContent = 'Ready! Hit the Send button to upload to storage.';
 
                 let type = 'file';
                 if (file.type.startsWith('image/')) type = 'image';
@@ -851,7 +845,7 @@
                 else if (file.type.startsWith('audio/')) type = 'audio';
 
                 stagedPayload = {
-                    content: e.target.result,
+                    localPreview: e.target.result,
                     type: type
                 };
 
@@ -869,7 +863,7 @@
 
         function clearStagedMedia() {
             stagedPayload = null;
-            recordedBlob = null;
+            recordedFileStaged = null;
             document.getElementById('media-preview-bar').classList.add('hidden');
             document.getElementById('media-preview-bar').classList.remove('flex');
             document.getElementById('upload-progress-bar').style.width = '0%';
@@ -883,13 +877,13 @@
 
                 mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
                 mediaRecorder.onstop = () => {
-                    recordedBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    recordedFileStaged = new File(audioChunks, `voice_${Date.now()}.webm`, { type: 'audio/webm' });
                 };
 
                 mediaRecorder.start();
                 isRecording = true;
                 isPaused = false;
-                recordedBlob = null;
+                recordedFileStaged = null;
 
                 document.getElementById('message-input').classList.add('hidden');
                 document.getElementById('recording-ui').classList.remove('hidden');
@@ -935,7 +929,7 @@
                 document.getElementById('media-preview-bar').classList.add('flex');
                 document.getElementById('preview-container').innerHTML = `<span class="text-indigo-400 font-bold text-xs">Voice Note Recorded (${recordingSeconds}s). Ready to Send.</span>`;
                 document.getElementById('upload-progress-bar').style.width = '100%';
-                document.getElementById('upload-status-text').textContent = 'Hit the Send button to dispatch voice note.';
+                document.getElementById('upload-status-text').textContent = 'Hit the Send button to upload voice note.';
             }
         }
 
@@ -974,21 +968,43 @@
                 };
             }
 
-            if (recordedBlob) {
-                const reader = new FileReader();
-                reader.readAsDataURL(recordedBlob);
-                reader.onloadend = async () => {
-                    await sendPayloadToSupabase(reader.result, 'audio', replyMeta);
-                    recordedBlob = null;
-                    resetRecordingUI();
-                    clearStagedMedia();
-                    cancelReply();
-                };
-                return;
-            }
+            // Handle file or voice note upload to Supabase bucket
+            if (recordedFileStaged || stagedPayload) {
+                const fileToUpload = recordedFileStaged;
+                let fileType = recordedFileStaged ? 'audio' : stagedPayload.type;
 
-            if (stagedPayload) {
-                await sendPayloadToSupabase(stagedPayload.content, stagedPayload.type, replyMeta);
+                if (!fileToUpload && stagedPayload) {
+                    // Fallback if file object wasn't captured directly
+                    alert('Please re-attach the file.');
+                    return;
+                }
+
+                const progressBar = document.getElementById('upload-progress-bar');
+                const statusText = document.getElementById('upload-status-text');
+                statusText.textContent = 'Uploading to storage bucket...';
+                progressBar.style.width = '50%';
+
+                const fileName = `${currentUser.username}_${Date.now()}_${fileToUpload.name || 'media.webm'}`;
+                const { data: uploadData, error: uploadError } = await supabaseClient.storage
+                    .from('chat-media')
+                    .upload(fileName, fileToUpload);
+
+                if (uploadError) {
+                    alert('Failed to upload file to storage: ' + uploadError.message);
+                    clearStagedMedia();
+                    return;
+                }
+
+                const { data: publicUrlData } = supabaseClient.storage
+                    .from('chat-media')
+                    .getPublicUrl(fileName);
+
+                const publicUrl = publicUrlData.publicUrl;
+                progressBar.style.width = '100%';
+
+                await sendPayloadToSupabase(publicUrl, fileType, replyMeta);
+                recordedFileStaged = null;
+                resetRecordingUI();
                 clearStagedMedia();
                 cancelReply();
                 return;
@@ -1080,7 +1096,7 @@
                 } else if (m.message_type === 'video') {
                     card.innerHTML = `<video src="${m.content}" class="h-24 w-full rounded object-cover" controls></video>`;
                 } else {
-                    card.innerHTML = `<a href="${m.content}" download class="text-xs text-indigo-400 underline font-semibold py-4">Download ${m.message_type}</a>`;
+                    card.innerHTML = `<a href="${m.content}" target="_blank" download class="text-xs text-indigo-400 underline font-semibold py-4">Download ${m.message_type}</a>`;
                 }
                 grid.appendChild(card);
             });

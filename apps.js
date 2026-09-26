@@ -218,7 +218,22 @@ function appendMessageToDOM(msg) {
     bubble.className = `max-w-[75%] px-4 py-2.5 rounded-2xl text-sm ${  
         isMe ? 'bg-indigo-600 text-white rounded-br-none' : 'bg-slate-800 text-slate-100 rounded-bl-none border border-slate-700/50'  
     }`;  
-    bubble.textContent = msg.content;  
+    
+    // Support rendering text or media attachments (images/videos/files)
+    if (msg.media_url) {
+        const fileExt = msg.media_url.split('.').pop().toLowerCase();
+        if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(fileExt)) {
+            bubble.innerHTML = `<img src="${msg.media_url}" class="rounded-xl max-h-60 object-cover mb-1 cursor-pointer" onclick="window.open(this.src)"><p>${msg.content || ''}</p>`;
+        } else if (['mp4', 'webm', 'ogg'].includes(fileExt)) {
+            bubble.innerHTML = `<video src="${msg.media_url}" controls class="rounded-xl max-h-60 mb-1"></video><p>${msg.content || ''}</p>`;
+        } else if (['mp3', 'wav', 'm4a'].includes(fileExt)) {
+            bubble.innerHTML = `<audio src="${msg.media_url}" controls class="w-full mb-1"></audio><p>${msg.content || ''}</p>`;
+        } else {
+            bubble.innerHTML = `<a href="${msg.media_url}" target="_blank" class="underline text-indigo-300 block mb-1">📎 Download Attachment</a><p>${msg.content || ''}</p>`;
+        }
+    } else {
+        bubble.textContent = msg.content;  
+    }
 
     const time = document.createElement('span');  
     time.className = 'text-[10px] text-slate-500 px-1';  
@@ -229,20 +244,21 @@ function appendMessageToDOM(msg) {
     container.appendChild(wrapper);
 }
 
-async function sendMessage(e) {
-    e.preventDefault();
+async function sendMessage(e, mediaUrl = null) {
+    if (e) e.preventDefault();
     if (!supabaseClient || !currentUser || !activeChatUser) return;
 
     const input = document.getElementById('message-input');  
-    const content = input.value.trim();  
-    if (!content) return;  
+    const content = input ? input.value.trim() : '';  
+    if (!content && !mediaUrl) return;  
 
     const { error } = await supabaseClient  
         .from('messages')  
         .insert([{  
             sender_username: currentUser.username,  
             receiver_username: activeChatUser.username,  
-            content: content  
+            content: content,
+            media_url: mediaUrl  
         }]);  
 
     if (error) {  
@@ -250,7 +266,7 @@ async function sendMessage(e) {
         return;  
     }  
 
-    input.value = '';
+    if (input) input.value = '';
 }
 
 function subscribeToMessages() {

@@ -210,6 +210,7 @@
         let audioChunks = [];
         let recordedBlob = null;
         let stagedPayload = null;
+        let stagedRawFile = null;
         let isRecording = false;
         let isPaused = false;
         let recordingTimerInterval = null;
@@ -514,55 +515,79 @@
             const file = event.target.files[0];
             if (!file) return;
 
-            const reader = new FileReader();
+            stagedRawFile = file;
             const progressBar = document.getElementById('upload-progress-bar');
             const statusText = document.getElementById('upload-status-text');
             document.getElementById('media-preview-bar').classList.remove('hidden');
             document.getElementById('media-preview-bar').classList.add('flex');
             
-            progressBar.style.width = '10%';
-            statusText.textContent = 'Reading file stream...';
+            progressBar.style.width = '30%';
+            statusText.textContent = 'File staged successfully.';
 
-            reader.onprogress = (data) => {
-                if (data.lengthComputable) {
-                    const percent = Math.round((data.loaded / data.total) * 90);
-                    progressBar.style.width = percent + '%';
-                }
+            let type = 'file';
+            if (file.type.startsWith('image/')) type = 'image';
+            else if (file.type.startsWith('video/')) type = 'video';
+            else if (file.type.startsWith('audio/')) type = 'audio';
+
+            stagedPayload = {
+                type: type,
+                fileName: file.name
             };
 
-            reader.onload = function(e) {
-                progressBar.style.width = '100%';
-                statusText.textContent = 'Ready! Hit the Send button to dispatch.';
-
-                let type = 'file';
-                if (file.type.startsWith('image/')) type = 'image';
-                else if (file.type.startsWith('video/')) type = 'video';
-                else if (file.type.startsWith('audio/')) type = 'audio';
-
-                stagedPayload = {
-                    content: e.target.result,
-                    type: type,
-                    fileName: file.name
-                };
-
-                const previewContainer = document.getElementById('preview-container');
-                if (type === 'image') {
-                    previewContainer.innerHTML = `<img src="${e.target.result}" class="max-h-20 rounded object-contain">`;
-                } else if (type === 'video') {
-                    previewContainer.innerHTML = `<video src="${e.target.result}" class="max-h-20 rounded" controls></video>`;
-                } else {
-                    previewContainer.innerHTML = `<span class="font-semibold">Staged File: ${file.name}</span>`;
-                }
-            };
-            reader.readAsDataURL(file);
+            const previewContainer = document.getElementById('preview-container');
+            const objectUrl = URL.createObjectURL(file);
+            if (type === 'image') {
+                previewContainer.innerHTML = `<img src="${objectUrl}" class="max-h-20 rounded object-contain">`;
+            } else if (type === 'video') {
+                previewContainer.innerHTML = `<video src="${objectUrl}" class="max-h-20 rounded" controls></video>`;
+            } else {
+                previewContainer.innerHTML = `<span class="font-semibold">Staged File: ${file.name}</span>`;
+            }
+            progressBar.style.width = '100%';
+            statusText.textContent = 'Ready! Hit the Send button to upload & deliver.';
         }
 
         function clearStagedMedia() {
             stagedPayload = null;
+            stagedRawFile = null;
             recordedBlob = null;
             document.getElementById('media-preview-bar').classList.add('hidden');
             document.getElementById('media-preview-bar').classList.remove('flex');
             document.getElementById('upload-progress-bar').style.width = '0%';
+        }
+
+        // --- SUPABASE STORAGE UPLOAD HELPER ---
+        async function uploadMediaToSupabase(fileBlob, fileType, originalName = 'media') {
+            if (!dbClient) return null;
+            const progressBar = document.getElementById('upload-progress-bar');
+            const statusText = document.getElementById('upload-status-text');
+            
+            progressBar.style.width = '20%';
+            statusText.textContent = 'Uploading media to bucket...';
+
+            const fileExt = originalName.split('.').pop() || (fileType === 'image' ? 'jpg' : fileType === 'video' ? 'mp4' : fileType === 'audio' ? 'webm' : 'bin');
+            const fileName = `groups/${groupId}/${Date.now()}_${Math.random().toString(36.substring(2, 8))}.${fileExt}`;
+
+            const { data, error } = await dbClient.storage
+                .from('chat-files')
+                .upload(fileName, fileBlob, { upsert: true });
+
+            if (error) {
+                alert('Storage upload failed: ' + error.message);
+                statusText.textContent = 'Upload failed.';
+                return null;
+            }
+
+            progressBar.style.width = '90%';
+            statusText.textContent = 'Fetching public URL...';
+
+            const { data: publicUrlData } = dbClient.storage
+                .from('chat-files')
+                .getPublicUrl(fileName);
+
+            progressBar.style.width = '100%';
+            statusText.textContent = 'Upload complete!';
+            return publicUrlData?.publicUrl || null;
         }
 
         // --- REPLY FEATURE ---
@@ -681,19 +706,21 @@
             }
 
             if (recordedBlob) {
-                const reader = new FileReader();
-                reader.readAsDataURL(recordedBlob);
-                reader.onloadend = async () => {
-                    await sendGroupPayloadToSupabase(reader.result, 'audio');
-                    recordedBlob = null;
-                    resetRecordingUI();
-                    clearStagedMedia();
-                };
+                const publicUrl = await uploadMediaToSupabase(recordedBlob, 'audio', `voicenote_${Date.now()}.webm`);
+                if (publicUrl) {
+                    await sendGroupPayloadToSupabase(publicUrl, 'audio');
+                }
+                recordedBlob = null;
+                resetRecordingUI();
+                clearStagedMedia();
                 return;
             }
 
-            if (stagedPayload) {
-                await sendGroupPayloadToSupabase(stagedPayload.content, stagedPayload.type);
+            if (stagedRawFile && stagedPayload) {
+                const publicUrl = await uploadMediaToSupabase(stagedRawFile, stagedPayload.type, stagedPayload.fileName);
+                if (publicUrl) {
+                    await sendGroupPayloadToSupabase(publicUrl, stagedPayload.type);
+                }
                 clearStagedMedia();
                 return;
             }
@@ -718,7 +745,7 @@
                 group_id: groupId,
                 sender_username: currentUser.username,
                 sender_name: currentUser.name,
-                message: content,
+                message: type === 'text' ? content : '[Media Attachment]',
                 media_url: type !== 'text' ? content : null,
                 media_type: type !== 'text' ? type : null,
                 ...replyData,
@@ -740,7 +767,7 @@
                 group_id: groupId,
                 sender_username: currentUser.username,
                 sender_name: currentUser.name,
-                message: content,
+                message: type === 'text' ? content : '[Media Attachment]',
                 media_url: type !== 'text' ? content : null,
                 media_type: type !== 'text' ? type : null,
                 ...replyData
@@ -894,12 +921,12 @@
             const type = msg.media_type || 'text';
 
             if (type === 'image') {
-                contentHtml = `<img src="${msg.media_url || msg.message}" class="rounded-xl max-h-48 object-cover cursor-pointer mb-1" onclick="window.open('${msg.media_url || msg.message}', '_blank')">`;
+                contentHtml = `<img src="${msg.media_url}" class="rounded-xl max-h-48 object-cover cursor-pointer mb-1" onclick="window.open('${msg.media_url}', '_blank')">`;
             } else if (type === 'video') {
-                contentHtml = `<video src="${msg.media_url || msg.message}" controls class="rounded-xl max-h-48 object-cover mb-1"></video>`;
+                contentHtml = `<video src="${msg.media_url}" controls class="rounded-xl max-h-48 object-cover mb-1"></video>`;
             } else if (type === 'audio') {
                 const audioId = 'audio_' + Math.random().toString(36).substring(2, 9);
-                const audioSrc = msg.media_url || msg.message;
+                const audioSrc = msg.media_url;
                 contentHtml = `
                     <div class="flex items-center gap-2.5 py-1 px-1 min-w-[220px]" data-audio-container>
                         <button type="button" onclick="toggleAudioPlay('${audioId}', this)" class="w-8 h-8 rounded-full bg-white/25 hover:bg-white/40 flex items-center justify-center text-xs font-bold transition-all flex-shrink-0 cursor-pointer">▶</button>
@@ -936,7 +963,7 @@
                 }, 50);
 
             } else if (type === 'file') {
-                contentHtml = `<a href="${msg.media_url || msg.message}" download class="flex items-center gap-2 underline text-xs font-semibold py-1">📁 File Attachment</a>`;
+                contentHtml = `<a href="${msg.media_url}" download class="flex items-center gap-2 underline text-xs font-semibold py-1">📁 File Attachment</a>`;
             } else {
                 contentHtml = `<span>${escapeHtml(msg.message)}</span>`;
             }
@@ -1168,7 +1195,8 @@
 
             const matching = messagesCache.filter(m => {
                 if (m.is_deleted_for_everyone) return false;
-                const url = m.media_url || m.message;
+                const url = m.media_url;
+                if (!url) return false;
                 if (typeFilter === 'image' && m.media_type === 'image') return true;
                 if (typeFilter === 'video' && m.media_type === 'video') return true;
                 if (typeFilter === 'file' && (m.media_type === 'file' || m.media_type === 'audio')) return true;
@@ -1181,7 +1209,7 @@
             }
 
             matching.forEach(m => {
-                const url = m.media_url || m.message;
+                const url = m.media_url;
                 const card = document.createElement('div');
                 card.className = 'bg-slate-900 border border-slate-800 rounded-lg p-2 flex flex-col items-center justify-center gap-2';
                 if (m.media_type === 'image') {
