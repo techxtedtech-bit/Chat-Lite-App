@@ -839,7 +839,6 @@
                 queueGroupOfflineMessage(localMessage);
                 registerBackgroundSync();
             } else if (data && data.length > 0) {
-                // Append immediately to local state and render without waiting for round-trip fetch
                 messagesCache.push(data[0]);
                 saveLocalGroupCache(messagesCache);
                 renderMessages(messagesCache);
@@ -899,7 +898,6 @@
             if (error) return;
 
             if (messages) {
-                // Merge with any remaining offline queue items visually if any
                 saveLocalGroupCache(messages);
                 renderMessages(messagesCache);
             }
@@ -1374,10 +1372,8 @@
 
             groupChannel
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'group_messages', filter: `group_id=eq.${groupId}` }, payload => {
-                    // Instantly sync inbound messages or changes from other users without full refetch delay
                     if (payload.eventType === 'INSERT') {
                         const newMsg = payload.new;
-                        // Avoid duplication if it's our own just-sent message
                         if (!messagesCache.some(m => m.id === newMsg.id)) {
                             messagesCache.push(newMsg);
                             saveLocalGroupCache(messagesCache);
