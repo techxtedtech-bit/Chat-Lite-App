@@ -124,6 +124,7 @@
     <script>
 
         let currentUser = JSON.parse(localStorage.getItem('chatlite_user'));
+        let isInitialLoad = true;
 
         /* ==========================================
            AUTH / INITIAL LOAD
@@ -143,14 +144,13 @@
             if (urlParams.get('forward') === 'true') {
                 const forwardPayload = localStorage.getItem('chatlite_forward_payload');
                 if (forwardPayload) {
-                    // Notify user to select a chat destination
                     const titleBar = document.querySelector('div.bg-slate-900\\/80 span');
                     if (titleBar) titleBar.textContent = 'Select chat to forward message';
                 }
             }
 
-            // Refresh list periodically
-            setInterval(loadConnectionsAndChats, 5000);
+            // Refresh list periodically without resetting UI state
+            setInterval(() => loadConnectionsAndChats(true), 5000);
         }
 
 
@@ -308,7 +308,7 @@
            LOAD GROUPS + PRIVATE CONNECTIONS
         ========================================== */
 
-        async function loadConnectionsAndChats() {
+        async function loadConnectionsAndChats(isBackgroundRefresh = false) {
 
             if (!navigator.onLine) return;
 
@@ -343,8 +343,16 @@
             const listContainer =
                 document.getElementById('members-list');
 
-            listContainer.innerHTML = '';
+            // Only show loading indicator on very first load
+            if (isInitialLoad) {
+                listContainer.innerHTML = `
+                    <div class="p-8 text-center text-slate-500 text-sm">
+                        Loading chats & connections...
+                    </div>
+                `;
+            }
 
+            const fragment = document.createDocumentFragment();
             let hasContent = false;
 
 
@@ -513,7 +521,7 @@
                         membership.status === 'pending'
                     ) {
 
-                        listContainer.appendChild(item);
+                        fragment.appendChild(item);
                     }
                 }
             }
@@ -675,7 +683,6 @@
                                 const forwardPayload = JSON.parse(localStorage.getItem('chatlite_forward_payload') || '{}');
                                 localStorage.removeItem('chatlite_forward_payload');
                                 
-                                // Send forwarded message to this target user
                                 supabaseClient.from('messages').insert([{
                                     sender_username: currentUser.username,
                                     receiver_username: member.username,
@@ -722,29 +729,8 @@
                         `;
 
 
-                        /* Block button */
-
-                        const blockButton =
-                            document.createElement('button');
-
-
-                        blockButton.className =
-                            'text-[10px] text-red-400 bg-red-950/30 hover:bg-red-900/50 px-2.5 py-1.5 rounded-lg border border-red-900/40 transition-all cursor-pointer';
-
-
-                        blockButton.textContent = 'Block';
-
-
-                        blockButton.onclick = function (event) {
-
-                            event.stopPropagation();
-
-                            blockUser(conn.id);
-                        };
-
-
+                        // Block button successfully removed as requested.
                         item.appendChild(chatArea);
-                        item.appendChild(blockButton);
                     }
 
 
@@ -879,7 +865,7 @@
                     }
 
 
-                    listContainer.appendChild(item);
+                    fragment.appendChild(item);
                 }
             }
 
@@ -904,7 +890,12 @@
 
                     </div>
                 `;
+            } else {
+                listContainer.innerHTML = '';
+                listContainer.appendChild(fragment);
             }
+
+            isInitialLoad = false;
         }
 
 
@@ -962,30 +953,6 @@
             }
 
             loadConnectionsAndChats();
-        }
-
-
-        /* ==========================================
-           BLOCK USER
-        ========================================== */
-
-        async function blockUser(connId) {
-
-            if (
-                confirm(
-                    "Are you sure you want to block this user?"
-                )
-            ) {
-
-                await supabaseClient
-                    .from('connections')
-                    .update({
-                        status: 'blocked'
-                    })
-                    .eq('id', connId);
-
-                loadConnectionsAndChats();
-            }
         }
 
 
