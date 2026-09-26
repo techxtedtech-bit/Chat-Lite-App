@@ -422,6 +422,50 @@
                             ' hover:bg-slate-800/50 cursor-pointer transition-all';
 
 
+                        // Fetch the latest message for this group
+                        const { data: groupLastMsgData } = await supabaseClient
+                            .from('group_messages')
+                            .select('*')
+                            .eq('group_id', group.id)
+                            .order('created_at', { ascending: false })
+                            .limit(1);
+
+                        let groupLastMsgText = group.description ? group.description : 'Tap to open chat';
+                        let groupTickHTML = '';
+                        let groupTimeStr = '';
+
+                        if (groupLastMsgData && groupLastMsgData.length > 0) {
+                            const gMsg = groupLastMsgData[0];
+                            if (!gMsg.is_deleted_for_everyone) {
+                                if (gMsg.media_type === 'image') {
+                                    groupLastMsgText = '📷 Photo';
+                                } else if (gMsg.media_type === 'video') {
+                                    groupLastMsgText = '🎬 Video';
+                                } else if (gMsg.media_type === 'audio') {
+                                    groupLastMsgText = '🎤 Voice note';
+                                } else if (gMsg.media_type === 'file') {
+                                    groupLastMsgText = '📁 File';
+                                } else {
+                                    groupLastMsgText = gMsg.message || '';
+                                }
+
+                                if (gMsg.created_at) {
+                                    const msgDate = new Date(gMsg.created_at);
+                                    const today = new Date();
+                                    if (msgDate.toDateString() === today.toDateString()) {
+                                        groupTimeStr = msgDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                                    } else {
+                                        groupTimeStr = msgDate.toLocaleDateString([], { month: 'short', day: 'numeric' });
+                                    }
+                                }
+
+                                if (gMsg.sender_username === currentUser.username) {
+                                    groupTickHTML = `<span class="text-orange-400 text-xs font-bold" title="Sent">✓✓</span>`;
+                                }
+                            }
+                        }
+
+
                         const groupOpenArea = document.createElement('div');
 
                         groupOpenArea.className =
@@ -445,13 +489,16 @@
 
                             <div class="flex-1 min-w-0">
 
-                                <h4 class="font-semibold text-sm truncate text-white">
-                                    ${escapeHTML(group.name)}
-                                </h4>
+                                <div class="flex items-center justify-between gap-1">
+                                    <h4 class="font-semibold text-sm truncate text-white">
+                                        ${escapeHTML(group.name)}
+                                    </h4>
+                                    <span class="text-[10px] text-slate-400 flex-shrink-0">${groupTimeStr}</span>
+                                </div>
 
-                                <p class="text-xs text-slate-400 truncate">
-                                    Group &bull;
-                                    ${escapeHTML(group.description || 'Tap to open chat')}
+                                <p class="text-xs text-slate-400 truncate flex items-center gap-1.5 mt-0.5">
+                                    ${groupTickHTML}
+                                    <span class="truncate">${escapeHTML(groupLastMsgText)}</span>
                                 </p>
 
                             </div>
@@ -461,7 +508,7 @@
                         const joinedBadge = document.createElement('span');
 
                         joinedBadge.className =
-                            'text-[10px] text-orange-400 bg-orange-950/30 px-2 py-1 rounded border border-orange-900/40 font-semibold uppercase';
+                            'text-[10px] text-orange-400 bg-orange-950/30 px-2 py-1 rounded border border-orange-900/40 font-semibold uppercase ml-2';
 
                         joinedBadge.textContent = 'Joined';
 
@@ -677,6 +724,7 @@
 
                         let lastMsgText = 'No messages yet';
                         let tickHTML = '';
+                        let timeStr = '';
                         let isUnread = false;
 
                         if (lastMsgData && lastMsgData.length > 0) {
@@ -688,6 +736,16 @@
                                 lastMsgText = '🎤 Voice note';
                             } else {
                                 lastMsgText = msg.content || '';
+                            }
+
+                            if (msg.created_at) {
+                                const msgDate = new Date(msg.created_at);
+                                const today = new Date();
+                                if (msgDate.toDateString() === today.toDateString()) {
+                                    timeStr = msgDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                                } else {
+                                    timeStr = msgDate.toLocaleDateString([], { month: 'short', day: 'numeric' });
+                                }
                             }
 
                             // Check unread status (if message was sent TO current user and is NOT read)
@@ -758,9 +816,12 @@
 
                             <div class="flex-1 min-w-0">
 
-                                <h4 class="font-semibold text-sm truncate ${isUnread ? 'text-white font-bold' : 'text-slate-200'}">
-                                    ${escapeHTML(member.name || member.username)}
-                                </h4>
+                                <div class="flex items-center justify-between gap-1">
+                                    <h4 class="font-semibold text-sm truncate ${isUnread ? 'text-white font-bold' : 'text-slate-200'}">
+                                        ${escapeHTML(member.name || member.username)}
+                                    </h4>
+                                    <span class="text-[10px] text-slate-400 flex-shrink-0">${timeStr}</span>
+                                </div>
 
                                 <p class="text-xs truncate flex items-center gap-1.5 mt-0.5 ${isUnread ? 'text-white font-bold' : 'text-slate-400'}">
                                     ${tickHTML}
