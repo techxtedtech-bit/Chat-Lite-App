@@ -667,6 +667,49 @@
                             ' hover:bg-slate-800/50 cursor-pointer transition-all';
 
 
+                        // Fetch the latest message between current user and this member
+                        const { data: lastMsgData } = await supabaseClient
+                            .from('messages')
+                            .select('*')
+                            .or(`and(sender_username.eq.${currentUser.username},receiver_username.eq.${member.username}),and(sender_username.eq.${member.username},receiver_username.eq.${currentUser.username})`)
+                            .order('created_at', { ascending: false })
+                            .limit(1);
+
+                        let lastMsgText = 'No messages yet';
+                        let tickHTML = '';
+                        let isUnread = false;
+
+                        if (lastMsgData && lastMsgData.length > 0) {
+                            const msg = lastMsgData[0];
+                            
+                            if (msg.message_type === 'image') {
+                                lastMsgText = '📷 Photo';
+                            } else if (msg.message_type === 'audio') {
+                                lastMsgText = '🎤 Voice note';
+                            } else {
+                                lastMsgText = msg.content || '';
+                            }
+
+                            // Check unread status (if message was sent TO current user and is NOT read)
+                            if (msg.receiver_username === currentUser.username && !msg.is_read) {
+                                isUnread = true;
+                            }
+
+                            // Ticks logic for messages sent by current user
+                            if (msg.sender_username === currentUser.username) {
+                                if (msg.is_read) {
+                                    tickHTML = `<span class="text-sky-400 font-bold text-xs" title="Read">✓✓</span>`;
+                                } else {
+                                    tickHTML = `<span class="text-slate-400 text-xs" title="Sent">✓✓</span>`;
+                                }
+                            } else {
+                                if (!msg.is_read) {
+                                    tickHTML = `<span class="w-2 h-2 rounded-full bg-orange-500 inline-block"></span>`;
+                                }
+                            }
+                        }
+
+
                         /* Clickable chat area */
 
                         const chatArea =
@@ -715,21 +758,19 @@
 
                             <div class="flex-1 min-w-0">
 
-                                <h4 class="font-semibold text-sm truncate text-white">
+                                <h4 class="font-semibold text-sm truncate ${isUnread ? 'text-white font-bold' : 'text-slate-200'}">
                                     ${escapeHTML(member.name || member.username)}
                                 </h4>
 
-                                <p class="text-xs text-slate-400 truncate">
-                                    @${escapeHTML(member.username)}
-                                    &bull;
-                                    Connected
+                                <p class="text-xs truncate flex items-center gap-1.5 mt-0.5 ${isUnread ? 'text-white font-bold' : 'text-slate-400'}">
+                                    ${tickHTML}
+                                    <span class="truncate">${escapeHTML(lastMsgText)}</span>
                                 </p>
 
                             </div>
                         `;
 
 
-                        // Block button successfully removed as requested.
                         item.appendChild(chatArea);
                     }
 
