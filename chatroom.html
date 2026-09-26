@@ -565,13 +565,14 @@
             let pressTimer = null;
             const startPress = (e) => {
                 if (msg.is_offline_pending) return; 
+                // Updated to 2000ms (2 seconds) as requested
                 pressTimer = setTimeout(() => {
                     if (isMultiSelectMode) {
                         if (msg.id) toggleMessageSelection(msg.id);
                     } else {
                         openMessageOptions(msg);
                     }
-                }, 500);
+                }, 2000);
             };
             const cancelPress = () => { if (pressTimer) clearTimeout(pressTimer); };
 
@@ -580,6 +581,58 @@
             wrapper.addEventListener('touchmove', cancelPress);
             wrapper.addEventListener('mousedown', startPress);
             wrapper.addEventListener('mouseup', cancelPress);
+
+            // --- SWIPE TO RIGHT REPLY ACTION IMPLEMENTATION ---
+            let touchStartX = 0;
+            let touchCurrentX = 0;
+            let isSwiping = false;
+
+            wrapper.addEventListener('touchstart', (e) => {
+                touchStartX = e.touches[0].clientX;
+                isSwiping = true;
+            }, {passive: true});
+
+            wrapper.addEventListener('touchmove', (e) => {
+                if (!isSwiping) return;
+                touchCurrentX = e.touches[0].clientX;
+                const diff = touchCurrentX - touchStartX;
+                if (diff > 0 && diff < 80) {
+                    wrapper.style.transform = `translateX(${diff}px)`;
+                }
+            }, {passive: true});
+
+            wrapper.addEventListener('touchend', (e) => {
+                if (!isSwiping) return;
+                isSwiping = false;
+                const diff = touchCurrentX - touchStartX;
+                wrapper.style.transform = 'translateX(0px)';
+                if (diff > 50) {
+                    setReplyTarget(msg);
+                }
+            });
+
+            // Desktop Mouse Swipe support for testing
+            wrapper.addEventListener('mousedown', (e) => {
+                touchStartX = e.clientX;
+                isSwiping = true;
+            });
+            window.addEventListener('mousemove', (e) => {
+                if (!isSwiping) return;
+                touchCurrentX = e.clientX;
+                const diff = touchCurrentX - touchStartX;
+                if (diff > 0 && diff < 80) {
+                    wrapper.style.transform = `translateX(${diff}px)`;
+                }
+            });
+            window.addEventListener('mouseup', (e) => {
+                if (!isSwiping) return;
+                isSwiping = false;
+                const diff = touchCurrentX - touchStartX;
+                wrapper.style.transform = 'translateX(0px)';
+                if (diff > 50) {
+                    setReplyTarget(msg);
+                }
+            });
 
             wrapper.addEventListener('click', (e) => {
                 if (isMultiSelectMode && msg.id) {
@@ -606,7 +659,23 @@
             } else if (type === 'video') {
                 contentBody.innerHTML = `<video src="${msg.content}" controls class="rounded-xl max-h-60 w-full"></video>`;
             } else if (type === 'audio') {
-                contentBody.innerHTML = `<audio src="${msg.content}" controls class="max-w-[200px] h-8"></audio>`;
+                // --- SLEEK & COMPACT VOICE NOTE DESIGN WITH ESTIMATED DURATION ---
+                const audioId = `audio_elem_${Math.random().toString(36).substring(2, 9)}`;
+                contentBody.innerHTML = `
+                    <div class="flex items-center gap-2.5 py-1 px-2 bg-slate-950/40 rounded-xl border border-white/10 w-[200px]">
+                        <button type="button" onclick="toggleAudioPlayback('${audioId}', this)" class="w-8 h-8 rounded-full bg-indigo-500 hover:bg-indigo-600 text-white flex items-center justify-center text-xs font-bold shadow transition-transform cursor-pointer flex-shrink-0">▶</button>
+                        <div class="flex-1 flex flex-col justify-center overflow-hidden">
+                            <div class="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden mb-1 relative">
+                                <div id="progress_${audioId}" class="bg-indigo-400 h-full w-0 transition-all"></div>
+                            </div>
+                            <div class="flex justify-between items-center text-[10px] text-slate-300 font-mono">
+                                <span id="current_${audioId}">0:00</span>
+                                <span id="duration_${audioId}">--:--</span>
+                            </div>
+                        </div>
+                        <audio id="${audioId}" src="${msg.content}" preload="metadata" onloadedmetadata="initAudioMetadata('${audioId}')" ontimeupdate="updateAudioProgress('${audioId}')" onended="resetAudioPlayer('${audioId}')" class="hidden"></audio>
+                    </div>
+                `;
             } else if (type === 'file') {
                 contentBody.innerHTML = `<a href="${msg.content}" target="_blank" download class="flex items-center gap-2 underline text-xs font-semibold py-1">📁 Download File Attachment</a>`;
             } else {
@@ -639,6 +708,53 @@
             container.appendChild(wrapper);
 
             if (scrollToBottom) container.scrollTop = container.scrollHeight;
+        }
+
+        // --- AUDIO PLAYER HELPER FUNCTIONS ---
+        function initAudioMetadata(audioId) {
+            const audio = document.getElementById(audioId);
+            const durationEl = document.getElementById(`duration_${audioId}`);
+            if (audio && durationEl && !isNaN(audio.duration)) {
+                const mins = Math.floor(audio.duration / 60);
+                const secs = Math.floor(audio.duration % 60);
+                durationEl.textContent = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+            }
+        }
+
+        function toggleAudioPlayback(audioId, btnEl) {
+            const audio = document.getElementById(audioId);
+            if (!audio) return;
+            if (audio.paused) {
+                audio.play();
+                btnEl.textContent = '⏸';
+            } else {
+                audio.pause();
+                btnEl.textContent = '▶';
+            }
+        }
+
+        function updateAudioProgress(audioId) {
+            const audio = document.getElementById(audioId);
+            const currentEl = document.getElementById(`current_${audioId}`);
+            const progressBar = document.getElementById(`progress_${audioId}`);
+            if (audio && currentEl && progressBar && !isNaN(audio.duration)) {
+                const mins = Math.floor(audio.currentTime / 60);
+                const secs = Math.floor(audio.currentTime % 60);
+                currentEl.textContent = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+                const percent = (audio.currentTime / audio.duration) * 100;
+                progressBar.style.width = `${percent}%`;
+            }
+        }
+
+        function resetAudioPlayer(audioId) {
+            const audio = document.getElementById(audioId);
+            const currentEl = document.getElementById(`current_${audioId}`);
+            const progressBar = document.getElementById(`progress_${audioId}`);
+            // Find parent button or wrapper to reset play icon if needed
+            if (audio && currentEl && progressBar) {
+                currentEl.textContent = '0:00';
+                progressBar.style.width = '0%';
+            }
         }
 
         // --- REAL-TIME TYPING & SYNCING ---
