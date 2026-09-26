@@ -921,12 +921,11 @@
             bubble.className = `flex flex-col ${isMe ? 'items-end' : 'items-start'} mb-2 relative select-none`;
             if (msg.id) bubble.setAttribute('data-id', msg.id);
 
-            // --- Long press detection (1 second requirement + blocking default context/selection menus) ---
+            // --- Long press detection (600 milliseconds requirement + blocking default context/selection menus) ---
             let pressTimer = null;
             const startPress = (e) => {
-                e.preventDefault(); // Prevent browser long press context menus / text highlights
                 if (pressTimer) clearTimeout(pressTimer);
-                pressTimer = setTimeout(() => openMessageOptions(msg), 1000); // 1 second duration
+                pressTimer = setTimeout(() => openMessageOptions(msg), 600); // 600ms duration
             };
             const cancelPress = (e) => {
                 if (pressTimer) {
@@ -935,7 +934,7 @@
                 }
             };
 
-            bubble.addEventListener('touchstart', startPress, { passive: false });
+            bubble.addEventListener('touchstart', startPress, { passive: true });
             bubble.addEventListener('touchend', cancelPress);
             bubble.addEventListener('touchmove', cancelPress);
             bubble.addEventListener('contextmenu', (e) => e.preventDefault()); // Block standard right-click context menu
@@ -980,7 +979,7 @@
                 contentHtml = `
                     <div class="flex items-center gap-2.5 py-1 px-1 min-w-[220px]" data-audio-container>
                         <button type="button" onclick="toggleAudioPlay('${audioId}', this)" class="w-8 h-8 rounded-full bg-white/25 hover:bg-white/40 flex items-center justify-center text-xs font-bold transition-all flex-shrink-0 cursor-pointer">▶</button>
-                        <audio id="${audioId}" src="${audioSrc}" preload="metadata"></audio>
+                        <audio id="${audioId}" src="${audioSrc}" preload="auto" crossorigin="anonymous"></audio>
                         <div class="flex flex-col flex-1 gap-1">
                             <div class="flex justify-between items-center text-[10px] opacity-80">
                                 <span class="audio-current-time">0:00</span>
@@ -997,6 +996,7 @@
                     const c = audioEl.closest('[data-audio-container]');
                     const rangeEl = c.querySelector('.audio-range');
                     const timeEl = c.querySelector('.audio-current-time');
+                    const playBtn = c.querySelector('button');
 
                     audioEl.addEventListener('loadedmetadata', () => {
                         timeEl.textContent = formatAudioTime(audioEl.duration);
@@ -1007,7 +1007,7 @@
                         timeEl.textContent = formatAudioTime(audioEl.currentTime);
                     });
                     audioEl.addEventListener('ended', () => {
-                        c.querySelector('button').textContent = '▶';
+                        playBtn.textContent = '▶';
                         audioEl.currentTime = 0;
                     });
                 }, 50);
@@ -1205,9 +1205,13 @@
         // --- AUDIO CONTROLS HELPER FUNCTIONS ---
         function toggleAudioPlay(audioId, btn) {
             const audio = document.getElementById(audioId);
+            if (!audio) return;
             if (audio.paused) {
-                audio.play();
-                btn.textContent = '⏸';
+                audio.play().then(() => {
+                    btn.textContent = '⏸';
+                }).catch(err => {
+                    console.error('Audio playback error:', err);
+                });
             } else {
                 audio.pause();
                 btn.textContent = '▶';
@@ -1216,12 +1220,13 @@
 
         function seekAudio(audioId, value) {
             const audio = document.getElementById(audioId);
-            if (!audio.duration) return;
+            if (!audio || !audio.duration) return;
             audio.currentTime = (value / 100) * audio.duration;
         }
 
         function toggleAudioSpeed(audioId, speedBtn) {
             const audio = document.getElementById(audioId);
+            if (!audio) return;
             let nextRate = audio.playbackRate === 1 ? 1.5 : audio.playbackRate === 1.5 ? 2 : 1;
             audio.playbackRate = nextRate;
             speedBtn.textContent = nextRate + 'x';
