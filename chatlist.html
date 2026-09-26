@@ -381,8 +381,8 @@
                 `;
             }
 
-            const fragment = document.createDocumentFragment();
-            let hasContent = false;
+            // Array to collect all items with their latest activity timestamp for sorting
+            let chatItems = [];
 
 
             /* ==========================================
@@ -445,8 +445,6 @@
 
                     if (membership.status === 'accepted') {
 
-                        hasContent = true;
-
                         item.className +=
                             ' hover:bg-slate-800/50 cursor-pointer transition-all';
 
@@ -462,9 +460,13 @@
                         let groupLastMsgText = group.description ? group.description : 'Tap to open chat';
                         let groupTickHTML = '';
                         let groupTimeStr = '';
+                        let groupActivityTime = group.created_at ? new Date(group.created_at).getTime() : 0;
 
                         if (groupLastMsgData && groupLastMsgData.length > 0) {
                             const gMsg = groupLastMsgData[0];
+                            if (gMsg.created_at) {
+                                groupActivityTime = new Date(gMsg.created_at).getTime();
+                            }
                             if (!gMsg.is_deleted_for_everyone) {
                                 if (gMsg.media_type === 'image') {
                                     groupLastMsgText = '📷 Photo';
@@ -535,6 +537,7 @@
 
 
                         item.appendChild(groupOpenArea);
+                        chatItems.push({ element: item, lastActivity: groupActivityTime });
                     }
 
 
@@ -542,7 +545,7 @@
 
                     else if (membership.status === 'pending') {
 
-                        hasContent = true;
+                        const inviteActivityTime = membership.created_at ? new Date(membership.created_at).getTime() : Date.now();
 
                         item.innerHTML = `
 
@@ -580,15 +583,8 @@
 
                             </div>
                         `;
-                    }
 
-
-                    if (
-                        membership.status === 'accepted' ||
-                        membership.status === 'pending'
-                    ) {
-
-                        fragment.appendChild(item);
+                        chatItems.push({ element: item, lastActivity: inviteActivityTime });
                     }
                 }
             }
@@ -728,8 +724,6 @@
 
                     if (conn.status === 'accepted') {
 
-                        hasContent = true;
-
                         item.className +=
                             ' hover:bg-slate-800/50 cursor-pointer transition-all';
 
@@ -746,9 +740,13 @@
                         let tickHTML = '';
                         let timeStr = '';
                         let isUnread = false;
+                        let chatActivityTime = conn.created_at ? new Date(conn.created_at).getTime() : 0;
 
                         if (lastMsgData && lastMsgData.length > 0) {
                             const msg = lastMsgData[0];
+                            if (msg.created_at) {
+                                chatActivityTime = new Date(msg.created_at).getTime();
+                            }
                             
                             if (msg.message_type === 'image') {
                                 lastMsgText = '📷 Photo';
@@ -853,6 +851,7 @@
 
 
                         item.appendChild(chatArea);
+                        chatItems.push({ element: item, lastActivity: chatActivityTime });
                     }
 
 
@@ -862,6 +861,7 @@
 
                     else if (conn.status === 'pending') {
 
+                        const connActivityTime = conn.created_at ? new Date(conn.created_at).getTime() : Date.now();
 
                         /* Incoming request */
 
@@ -869,8 +869,6 @@
                             conn.receiver_username ===
                             currentUser.username
                         ) {
-
-                            hasContent = true;
 
                             item.innerHTML = `
 
@@ -915,8 +913,6 @@
 
                         else {
 
-                            hasContent = true;
-
                             item.innerHTML = `
 
                                 <div class="flex items-center gap-3.5 flex-1 min-w-0">
@@ -944,6 +940,8 @@
                                 </button>
                             `;
                         }
+
+                        chatItems.push({ element: item, lastActivity: connActivityTime });
                     }
 
 
@@ -953,8 +951,7 @@
 
                     else if (conn.status === 'blocked') {
 
-                        hasContent = true;
-
+                        const blockActivityTime = conn.created_at ? new Date(conn.created_at).getTime() : 0;
                         item.className += ' opacity-60';
 
 
@@ -984,19 +981,30 @@
                                 Unblock
                             </button>
                         `;
+
+                        chatItems.push({ element: item, lastActivity: blockActivityTime });
                     }
-
-
-                    fragment.appendChild(item);
                 }
             }
+
+
+            /* ==========================================
+               SORT BY RECENT ACTIVITY & RENDER
+            ========================================== */
+
+            chatItems.sort((a, b) => b.lastActivity - a.lastActivity);
+
+            const fragment = document.createDocumentFragment();
+            chatItems.forEach(itemObj => {
+                fragment.appendChild(itemObj.element);
+            });
 
 
             /* ==========================================
                EMPTY STATE
             ========================================== */
 
-            if (!hasContent) {
+            if (chatItems.length === 0) {
 
                 listContainer.innerHTML = `
 
