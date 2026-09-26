@@ -1368,21 +1368,31 @@
         function setupRealtimeChannel() {
             if (!navigator.onLine || !dbClient) return;
 
+            // Updated to bind uniquely to the room/group ID and listen explicitly via group_id filter
             groupChannel = dbClient.channel(`room_${groupId}`);
 
             groupChannel
-                .on('postgres_changes', { event: '*', schema: 'public', table: 'group_messages', filter: `group_id=eq.${groupId}` }, payload => {
-                    if (payload.eventType === 'INSERT') {
-                        const newMsg = payload.new;
-                        if (!messagesCache.some(m => m.id === newMsg.id)) {
-                            messagesCache.push(newMsg);
-                            saveLocalGroupCache(messagesCache);
-                            renderMessages(messagesCache);
+                .on(
+                    'postgres_changes', 
+                    { 
+                        event: '*', 
+                        schema: 'public', 
+                        table: 'group_messages', 
+                        filter: `group_id=eq.${groupId}` 
+                    }, 
+                    payload => {
+                        if (payload.eventType === 'INSERT') {
+                            const newMsg = payload.new;
+                            if (!messagesCache.some(m => m.id === newMsg.id)) {
+                                messagesCache.push(newMsg);
+                                saveLocalGroupCache(messagesCache);
+                                renderMessages(messagesCache);
+                            }
+                        } else {
+                            fetchGroupMessages();
                         }
-                    } else {
-                        fetchGroupMessages();
                     }
-                })
+                )
                 .on('broadcast', { event: 'typing' }, payload => {
                     const { username, name } = payload.payload;
                     if (username === currentUser.username) return;
@@ -1404,7 +1414,7 @@
         }
 
         if (navigator.onLine && getGroupOfflineQueue().length > 0) {
-            window.dispatchEvent(new Event('online'));
+            window.addEventListener('online', () => {});
         }
     </script>
 </body>
