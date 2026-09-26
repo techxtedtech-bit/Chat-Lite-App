@@ -565,14 +565,14 @@
             let pressTimer = null;
             const startPress = (e) => {
                 if (msg.is_offline_pending) return; 
-                // Updated to 2000ms (2 seconds) as requested
+                // Adjusted down to 1200ms (1.2 seconds) as requested
                 pressTimer = setTimeout(() => {
                     if (isMultiSelectMode) {
                         if (msg.id) toggleMessageSelection(msg.id);
                     } else {
                         openMessageOptions(msg);
                     }
-                }, 2000);
+                }, 1200);
             };
             const cancelPress = () => { if (pressTimer) clearTimeout(pressTimer); };
 
@@ -659,19 +659,24 @@
             } else if (type === 'video') {
                 contentBody.innerHTML = `<video src="${msg.content}" controls class="rounded-xl max-h-60 w-full"></video>`;
             } else if (type === 'audio') {
-                // --- SLEEK & COMPACT VOICE NOTE DESIGN WITH ESTIMATED DURATION ---
+                // --- REDESIGNED COMPACT VOICE NOTE PLAYER WITH REWIND, FAST FORWARD & SPEED CONTROLS ---
                 const audioId = `audio_elem_${Math.random().toString(36).substring(2, 9)}`;
                 contentBody.innerHTML = `
-                    <div class="flex items-center gap-2.5 py-1 px-2 bg-slate-950/40 rounded-xl border border-white/10 w-[200px]">
-                        <button type="button" onclick="toggleAudioPlayback('${audioId}', this)" class="w-8 h-8 rounded-full bg-indigo-500 hover:bg-indigo-600 text-white flex items-center justify-center text-xs font-bold shadow transition-transform cursor-pointer flex-shrink-0">▶</button>
-                        <div class="flex-1 flex flex-col justify-center overflow-hidden">
-                            <div class="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden mb-1 relative">
-                                <div id="progress_${audioId}" class="bg-indigo-400 h-full w-0 transition-all"></div>
+                    <div class="flex flex-col gap-1.5 py-1 px-2 bg-slate-950/60 rounded-xl border border-white/10 w-[240px]">
+                        <div class="flex items-center gap-2">
+                            <button type="button" onclick="toggleAudioPlayback('${audioId}', this)" class="w-7 h-7 rounded-full bg-indigo-500 hover:bg-indigo-600 text-white flex items-center justify-center text-[11px] font-bold shadow transition-transform cursor-pointer flex-shrink-0">▶</button>
+                            <button type="button" onclick="skipAudioTime('${audioId}', -5)" class="text-[10px] text-slate-300 hover:text-white px-1.5 py-0.5 bg-slate-800/80 rounded cursor-pointer" title="Rewind 5 seconds">-5s</button>
+                            <div class="flex-1 flex flex-col justify-center overflow-hidden cursor-pointer" onclick="seekAudioBar(event, '${audioId}')">
+                                <div class="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden relative">
+                                    <div id="progress_${audioId}" class="bg-indigo-400 h-full w-0 transition-all"></div>
+                                </div>
                             </div>
-                            <div class="flex justify-between items-center text-[10px] text-slate-300 font-mono">
-                                <span id="current_${audioId}">0:00</span>
-                                <span id="duration_${audioId}">--:--</span>
-                            </div>
+                            <button type="button" onclick="skipAudioTime('${audioId}', 5)" class="text-[10px] text-slate-300 hover:text-white px-1.5 py-0.5 bg-slate-800/80 rounded cursor-pointer" title="Fast Forward 5 seconds">+5s</button>
+                            <button type="button" onclick="cycleAudioSpeed('${audioId}', this)" class="text-[10px] font-bold text-indigo-300 hover:text-white px-1.5 py-0.5 bg-slate-800 rounded cursor-pointer w-7 text-center" id="speed_${audioId}">1x</button>
+                        </div>
+                        <div class="flex justify-between items-center text-[9px] text-slate-400 font-mono px-1">
+                            <span id="current_${audioId}">0:00</span>
+                            <span id="duration_${audioId}">--:--</span>
                         </div>
                         <audio id="${audioId}" src="${msg.content}" preload="metadata" onloadedmetadata="initAudioMetadata('${audioId}')" ontimeupdate="updateAudioProgress('${audioId}')" onended="resetAudioPlayer('${audioId}')" class="hidden"></audio>
                     </div>
@@ -750,11 +755,40 @@
             const audio = document.getElementById(audioId);
             const currentEl = document.getElementById(`current_${audioId}`);
             const progressBar = document.getElementById(`progress_${audioId}`);
-            // Find parent button or wrapper to reset play icon if needed
+            const playBtn = audio.parentElement.querySelector('button');
             if (audio && currentEl && progressBar) {
                 currentEl.textContent = '0:00';
                 progressBar.style.width = '0%';
+                if (playBtn) playBtn.textContent = '▶';
             }
+        }
+
+        function skipAudioTime(audioId, seconds) {
+            const audio = document.getElementById(audioId);
+            if (!audio || isNaN(audio.duration)) return;
+            audio.currentTime = Math.min(Math.max(audio.currentTime + seconds, 0), audio.duration);
+        }
+
+        function seekAudioBar(event, audioId) {
+            const audio = document.getElementById(audioId);
+            if (!audio || isNaN(audio.duration)) return;
+            const rect = event.currentTarget.getBoundingClientRect();
+            const clickX = event.clientX - rect.left;
+            const width = rect.width;
+            const percent = clickX / width;
+            audio.currentTime = percent * audio.duration;
+        }
+
+        function cycleAudioSpeed(audioId, btnEl) {
+            const audio = document.getElementById(audioId);
+            if (!audio) return;
+            let speeds = [1, 1.25, 1.5, 2];
+            let currentRate = audio.playbackRate;
+            let nextIndex = (speeds.indexOf(currentRate) + 1) % speeds.length;
+            if (nextIndex < 0) nextIndex = 0;
+            let newRate = speeds[nextIndex];
+            audio.playbackRate = newRate;
+            btnEl.textContent = `${newRate}x`;
         }
 
         // --- REAL-TIME TYPING & SYNCING ---
