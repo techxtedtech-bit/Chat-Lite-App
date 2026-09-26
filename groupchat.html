@@ -566,7 +566,7 @@
             statusText.textContent = 'Uploading media to bucket...';
 
             const fileExt = originalName.split('.').pop() || (fileType === 'image' ? 'jpg' : fileType === 'video' ? 'mp4' : fileType === 'audio' ? 'webm' : 'bin');
-            const fileName = `groups/${groupId}/${Date.now()}_${Math.random().toString(36.substring(2, 8))}.${fileExt}`;
+            const fileName = `groups/${groupId}/${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${fileExt}`;
 
             const { data, error } = await dbClient.storage
                 .from('chat-files')
