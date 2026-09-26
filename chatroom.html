@@ -18,7 +18,7 @@
                     <div class="w-8 h-8 rounded-full bg-indigo-600/30 border border-indigo-500/30 flex items-center justify-center font-bold text-indigo-400 text-xs flex-shrink-0 overflow-hidden" id="active-chat-avatar">U</div>
                     <div class="overflow-hidden">
                         <h3 class="font-bold text-xs truncate group-hover:text-indigo-400 transition-colors" id="active-chat-name">Username</h3>
-                        <span class="text-[9px] text-slate-400 truncate block" id="active-chat-gender">Gender</span>
+                        <span class="text-[9px] text-slate-400 truncate block" id="active-chat-status">Offline</span>
                     </div>
                 </div>
             </div>
@@ -42,6 +42,16 @@
             <!-- Messages load here -->
         </div>
 
+        <!-- Live Typing Indicator Bar -->
+        <div id="typing-indicator" class="hidden px-4 py-1.5 bg-slate-950 text-[11px] text-indigo-400 italic flex items-center gap-1.5 flex-shrink-0">
+            <span class="flex gap-1">
+                <span class="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce"></span>
+                <span class="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce [animation-delay:0.2s]"></span>
+                <span class="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce [animation-delay:0.4s]"></span>
+            </span>
+            <span id="typing-text">typing...</span>
+        </div>
+
         <!-- Multi-Select Action Footer Bar (Hidden by default) -->
         <div id="multi-select-bar" class="hidden absolute bottom-0 left-0 right-0 bg-slate-900 border-t border-indigo-500/50 p-3 shadow-2xl z-40 flex items-center justify-between">
             <span id="selected-count-text" class="text-xs font-semibold text-indigo-300">0 selected</span>
@@ -57,14 +67,12 @@
             <button type="button" onclick="triggerUndoAction()" class="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-lg cursor-pointer">Undo (<span id="undo-countdown">10</span>s)</button>
         </div>
 
-        <!-- Custom Styled App Modal / Popup (Replaces Browser Native Alerts & Confirms) -->
+        <!-- Custom Styled App Modal / Popup -->
         <div id="custom-app-modal" class="hidden absolute inset-0 bg-slate-950/80 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
             <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-xs p-4 shadow-2xl flex flex-col gap-3">
                 <h3 id="custom-modal-title" class="font-bold text-sm text-white">Notice</h3>
                 <p id="custom-modal-message" class="text-xs text-slate-300 leading-relaxed">Message content goes here...</p>
-                <div id="custom-modal-actions" class="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
-                    <!-- Dynamic buttons injected via JS -->
-                </div>
+                <div id="custom-modal-actions" class="flex items-center justify-end gap-2 pt-2 border-t border-slate-800"></div>
             </div>
         </div>
 
@@ -75,9 +83,7 @@
                     <span>Message Options</span>
                     <button onclick="closeMessageOptions()" class="text-slate-400 hover:text-white text-base cursor-pointer">&times;</button>
                 </div>
-                <div id="message-options-actions" class="flex flex-col gap-1.5">
-                    <!-- Populated dynamically based on permissions & 3-hour limit for everyone -->
-                </div>
+                <div id="message-options-actions" class="flex flex-col gap-1.5"></div>
             </div>
         </div>
 
@@ -89,9 +95,7 @@
                     <button onclick="closeUserProfileModal()" class="text-slate-400 hover:text-white text-lg cursor-pointer px-2">&times;</button>
                 </div>
                 <div class="flex flex-col items-center text-center gap-3 py-2">
-                    <div id="profile-modal-avatar-container" class="w-20 h-20 rounded-full bg-indigo-600/30 border-2 border-indigo-500/50 flex items-center justify-center font-bold text-indigo-300 text-2xl overflow-hidden shadow-lg">
-                        U
-                    </div>
+                    <div id="profile-modal-avatar-container" class="w-20 h-20 rounded-full bg-indigo-600/30 border-2 border-indigo-500/50 flex items-center justify-center font-bold text-indigo-300 text-2xl overflow-hidden shadow-lg">U</div>
                     <div>
                         <h2 id="profile-modal-name" class="font-bold text-base text-white">Loading...</h2>
                         <span id="profile-modal-username" class="text-xs text-indigo-400 block">@username</span>
@@ -117,7 +121,7 @@
             </div>
         </div>
 
-        <!-- Reply Preview Bar (Shown when replying to a message) -->
+        <!-- Reply Preview Bar -->
         <div id="reply-preview-bar" class="hidden p-2.5 bg-slate-900 border-t border-slate-800 items-center justify-between z-20 flex-shrink-0">
             <div class="flex flex-col border-l-2 border-indigo-500 pl-2 overflow-hidden">
                 <span class="text-[10px] font-bold text-indigo-400" id="reply-target-sender">Replying to...</span>
@@ -126,16 +130,13 @@
             <button type="button" onclick="cancelReply()" class="text-slate-400 hover:text-white text-base px-2 cursor-pointer">&times;</button>
         </div>
 
-        <!-- Media Preview Staging Bar (Shown when media/file is staged before sending) -->
+        <!-- Media Preview Staging Bar -->
         <div id="media-preview-bar" class="hidden p-2.5 bg-slate-950 border-t border-slate-800 flex-col gap-1.5 z-20 flex-shrink-0">
             <div class="flex items-center justify-between">
                 <span class="text-xs font-semibold text-indigo-400">Staged Media Preview</span>
                 <button type="button" onclick="clearStagedMedia()" class="text-[11px] text-slate-400 hover:text-white px-2 py-0.5 bg-slate-800 rounded">Discard</button>
             </div>
-            <div id="preview-container" class="max-h-24 overflow-hidden rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center p-1.5 text-xs text-slate-300">
-                <!-- Preview content/thumbnail -->
-            </div>
-            <!-- Upload Progress Bar -->
+            <div id="preview-container" class="max-h-24 overflow-hidden rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center p-1.5 text-xs text-slate-300"></div>
             <div class="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
                 <div id="upload-progress-bar" class="bg-indigo-600 h-full w-0 transition-all duration-300"></div>
             </div>
@@ -149,15 +150,9 @@
 
         <!-- Attachment Options Popup Menu -->
         <div id="attachment-menu" class="hidden absolute bottom-16 left-3 bg-slate-800 border border-slate-700 rounded-2xl shadow-xl p-2 z-30 flex flex-col gap-1 w-48 backdrop-blur-md">
-            <button type="button" onclick="document.getElementById('media-file-input').click(); toggleAttachmentMenu();" class="flex items-center gap-3 px-3 py-2 text-xs font-medium text-slate-200 hover:bg-slate-700/80 rounded-xl transition-all cursor-pointer">
-                📁 File / Document
-            </button>
-            <button type="button" onclick="document.getElementById('camera-photo-input').click(); toggleAttachmentMenu();" class="flex items-center gap-3 px-3 py-2 text-xs font-medium text-slate-200 hover:bg-slate-700/80 rounded-xl transition-all cursor-pointer">
-                📷 Take Photo
-            </button>
-            <button type="button" onclick="document.getElementById('camera-video-input').click(); toggleAttachmentMenu();" class="flex items-center gap-3 px-3 py-2 text-xs font-medium text-slate-200 hover:bg-slate-700/80 rounded-xl transition-all cursor-pointer">
-                📹 Record Video Note
-            </button>
+            <button type="button" onclick="document.getElementById('media-file-input').click(); toggleAttachmentMenu();" class="flex items-center gap-3 px-3 py-2 text-xs font-medium text-slate-200 hover:bg-slate-700/80 rounded-xl transition-all cursor-pointer">📁 File / Document</button>
+            <button type="button" onclick="document.getElementById('camera-photo-input').click(); toggleAttachmentMenu();" class="flex items-center gap-3 px-3 py-2 text-xs font-medium text-slate-200 hover:bg-slate-700/80 rounded-xl transition-all cursor-pointer">📷 Take Photo</button>
+            <button type="button" onclick="document.getElementById('camera-video-input').click(); toggleAttachmentMenu();" class="flex items-center gap-3 px-3 py-2 text-xs font-medium text-slate-200 hover:bg-slate-700/80 rounded-xl transition-all cursor-pointer">📹 Record Video Note</button>
         </div>
 
         <!-- Media Gallery Modal Drawer -->
@@ -166,21 +161,15 @@
                 <h3 class="font-bold text-sm text-white" id="gallery-title">Chat Media</h3>
                 <button onclick="closeMediaGallery()" class="text-xs text-slate-400 hover:text-white px-2 py-1 bg-slate-800 rounded-lg">Close</button>
             </div>
-            <div id="gallery-content-grid" class="flex-1 overflow-y-auto grid grid-cols-2 gap-2 pt-3">
-                <!-- Gallery items populated here -->
-            </div>
+            <div id="gallery-content-grid" class="flex-1 overflow-y-auto grid grid-cols-2 gap-2 pt-3"></div>
         </div>
 
-        <!-- Bottom Input Bar (Fixed & Always Visible) -->
+        <!-- Bottom Input Bar -->
         <form id="chat-form" onsubmit="handleFormSubmit(event)" class="p-3 bg-slate-900 border-t border-slate-800 flex items-center gap-2 relative z-25 flex-shrink-0">
-            <button type="button" id="attach-btn" onclick="toggleAttachmentMenu()" class="p-2 text-slate-400 hover:text-indigo-400 transition-colors text-lg font-bold cursor-pointer flex-shrink-0" title="Attach Media">
-                +
-            </button>
+            <button type="button" id="attach-btn" onclick="toggleAttachmentMenu()" class="p-2 text-slate-400 hover:text-indigo-400 transition-colors text-lg font-bold cursor-pointer flex-shrink-0" title="Attach Media">+</button>
             
-            <!-- Standard Text Input -->
-            <input type="text" id="message-input" placeholder="Type a message..." class="flex-1 px-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl focus:outline-none focus:border-indigo-500 text-sm text-white min-w-0">
+            <input type="text" id="message-input" placeholder="Type a message..." oninput="handleTypingInput()" class="flex-1 px-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl focus:outline-none focus:border-indigo-500 text-sm text-white min-w-0">
             
-            <!-- Live Recording Indicator & Controls UI (Hidden by default) -->
             <div id="recording-ui" class="hidden flex-1 items-center justify-between px-3 py-2 bg-slate-950 border border-red-500/50 rounded-xl min-w-0">
                 <div class="flex items-center gap-2">
                     <span class="w-3 h-3 rounded-full bg-red-500 animate-pulse flex-shrink-0"></span>
@@ -193,10 +182,7 @@
                 </div>
             </div>
 
-            <button type="button" id="mic-btn" onclick="startVoiceRecording()" class="p-2 text-slate-400 hover:text-red-400 transition-colors cursor-pointer flex-shrink-0" title="Record Voice Note">
-                🎤
-            </button>
-            
+            <button type="button" id="mic-btn" onclick="startVoiceRecording()" class="p-2 text-slate-400 hover:text-red-400 transition-colors cursor-pointer flex-shrink-0" title="Record Voice Note">🎤</button>
             <button type="submit" id="send-btn" class="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 font-semibold rounded-xl text-sm transition-all cursor-pointer text-white flex-shrink-0">Send</button>
         </form>
     </div>
@@ -214,13 +200,14 @@
         }
 
         document.getElementById('active-chat-name').textContent = targetName;
-        document.getElementById('active-chat-gender').textContent = `@${targetUsername} • ${targetGender}`;
+        document.getElementById('active-chat-status').textContent = `@${targetUsername} • ${targetGender}`;
         document.getElementById('active-chat-avatar').textContent = targetName.charAt(0).toUpperCase();
 
         const STORAGE_KEY = `chatlite_cache_${currentUser.username}_${targetUsername}`;
         const QUEUE_KEY = `chatlite_offline_queue_${currentUser.username}_${targetUsername}`;
 
         let messageSubscription = null;
+        let typingSubscription = null;
         let messagesCache = loadLocalCache();
         let mediaRecorder = null;
         let audioChunks = [];
@@ -233,28 +220,23 @@
         let replyingToMessage = null;
         let fetchedTargetProfile = null;
 
-        // Multi-select state variables
         let isMultiSelectMode = false;
         let selectedMessageIds = new Set();
-
-        // Undo & Deletion management variables
         let pendingDeleteTimer = null;
         let undoTargetMessage = null;
+        let typingTimeout = null;
 
         if (messagesCache.length > 0) {
             renderMessages(messagesCache);
         }
 
-        // --- CUSTOM MODAL HELPER FUNCTIONS (Replaces native alert/confirm) ---
         function showCustomAlert(title, message, onOk = null) {
             const modal = document.getElementById('custom-app-modal');
             document.getElementById('custom-modal-title').textContent = title;
             document.getElementById('custom-modal-message').textContent = message;
             
             const actions = document.getElementById('custom-modal-actions');
-            actions.innerHTML = `
-                <button type="button" id="custom-modal-ok-btn" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl cursor-pointer transition-all">OK</button>
-            `;
+            actions.innerHTML = `<button type="button" id="custom-modal-ok-btn" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl cursor-pointer transition-all">OK</button>`;
             
             modal.classList.remove('hidden');
             modal.classList.add('flex');
@@ -321,8 +303,7 @@
         }
 
         function toggleAttachmentMenu() {
-            const menu = document.getElementById('attachment-menu');
-            menu.classList.toggle('hidden');
+            document.getElementById('attachment-menu').classList.toggle('hidden');
         }
 
         function toggleSearchBox() {
@@ -335,7 +316,6 @@
             }
         }
 
-        // --- USER PROFILE & BLOCK MODAL FUNCTIONS ---
         async function openUserProfileModal() {
             const modal = document.getElementById('user-profile-modal');
             const nameEl = document.getElementById('profile-modal-name');
@@ -345,7 +325,6 @@
             const avatarContainer = document.getElementById('profile-modal-avatar-container');
 
             modal.classList.remove('hidden');
-
             nameEl.textContent = targetName;
             usernameEl.textContent = `@${targetUsername}`;
             avatarContainer.innerHTML = targetName ? targetName.charAt(0).toUpperCase() : 'U';
@@ -358,15 +337,12 @@
                     .single();
 
                 if (!error && data) {
-                    fetchedTargetProfile = data;
                     nameEl.textContent = data.name || targetName;
                     usernameEl.textContent = `@${data.username}`;
                     chatCodeEl.textContent = data.chat_code || data.unique_code || 'N/A';
                     bioEl.textContent = data.bio || 'No bio available.';
-
                     if (data.avatar_url || data.image_url) {
-                        const imgUrl = data.avatar_url || data.image_url;
-                        avatarContainer.innerHTML = `<img src="${imgUrl}" class="w-full h-full object-cover">`;
+                        avatarContainer.innerHTML = `<img src="${data.avatar_url || data.image_url}" class="w-full h-full object-cover">`;
                     }
                 } else {
                     chatCodeEl.textContent = 'Unavailable';
@@ -384,50 +360,26 @@
 
         function copyChatCode() {
             const codeText = document.getElementById('profile-modal-chatcode').textContent;
-            if (codeText && codeText !== '--' && codeText !== 'N/A' && codeText !== 'Unavailable') {
+            if (codeText && codeText !== '--' && codeText !== 'N/A') {
                 navigator.clipboard.writeText(codeText);
                 showCustomAlert('Copied', 'Unique chat code copied to clipboard!');
-            } else {
-                showCustomAlert('Notice', 'No chat code available to copy.');
             }
         }
 
         function blockActiveUser() {
-            showCustomConfirm(
-                'Block User',
-                `Are you sure you want to block @${targetUsername}? You will no longer receive messages from them.`,
-                async () => {
-                    const blockPayload = {
-                        blocker_username: currentUser.username,
-                        blocked_username: targetUsername,
-                        created_at: new Date().toISOString()
-                    };
-
-                    if (navigator.onLine) {
-                        const { error } = await supabaseClient
-                            .from('blocked_users')
-                            .insert([blockPayload]);
-
-                        if (error) {
-                            console.error('Error blocking user on Supabase:', error);
-                        }
-                    }
-
-                    let blockedList = [];
-                    try {
-                        blockedList = JSON.parse(localStorage.getItem(`chatlite_blocked_${currentUser.username}`) || '[]');
-                    } catch(e) {}
-
-                    if (!blockedList.includes(targetUsername)) {
-                        blockedList.push(targetUsername);
-                        localStorage.setItem(`chatlite_blocked_${currentUser.username}`, JSON.stringify(blockedList));
-                    }
-
-                    showCustomAlert('Blocked', `Successfully blocked @${targetUsername}.`, () => {
-                        window.location.href = 'chatlist.html';
-                    });
+            showCustomConfirm('Block User', `Are you sure you want to block @${targetUsername}?`, async () => {
+                let blockedList = [];
+                try {
+                    blockedList = JSON.parse(localStorage.getItem(`chatlite_blocked_${currentUser.username}`) || '[]');
+                } catch(e) {}
+                if (!blockedList.includes(targetUsername)) {
+                    blockedList.push(targetUsername);
+                    localStorage.setItem(`chatlite_blocked_${currentUser.username}`, JSON.stringify(blockedList));
                 }
-            );
+                showCustomAlert('Blocked', `Successfully blocked @${targetUsername}.`, () => {
+                    window.location.href = 'chatlist.html';
+                });
+            });
         }
 
         async function fetchMessages() {
@@ -441,12 +393,7 @@
                 .or(`and(sender_username.eq.${currentUser.username},receiver_username.eq.${targetUsername}),and(sender_username.eq.${targetUsername},receiver_username.eq.${currentUser.username})`)
                 .order('created_at', { ascending: true });
 
-            if (error) {
-                console.error('Error fetching messages:', error);
-                return;
-            }
-
-            if (messages) {
+            if (!error && messages) {
                 saveLocalCache(messages);
                 renderMessages(messagesCache);
                 markIncomingMessagesAsRead(messages);
@@ -464,10 +411,23 @@
                 .map(m => m.id);
 
             if (unreadIds.length > 0) {
-                await supabaseClient
-                    .from('messages')
-                    .update({ is_read: true })
-                    .in('id', unreadIds);
+                await supabaseClient.from('messages').update({ is_read: true }).in('id', unreadIds);
+            }
+        }
+
+        // --- DATE & TIME FORMATTING UTILITIES ---
+        function formatDateDivider(dateString) {
+            const msgDate = new Date(dateString);
+            const today = new Date();
+            const yesterday = new Date(today);
+            yesterday.setDate(yesterday.getDate() - 1);
+
+            if (msgDate.toDateString() === today.toDateString()) {
+                return 'Today';
+            } else if (msgDate.toDateString() === yesterday.toDateString()) {
+                return 'Yesterday';
+            } else {
+                return msgDate.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
             }
         }
 
@@ -481,13 +441,23 @@
             } catch(e) {}
 
             const filtered = messages.filter(m => !hiddenForMe.includes(m.id) && !m.is_deleted_for_everyone);
-
             const offlineQueue = loadOfflineQueue();
             const combinedList = [...filtered, ...offlineQueue];
             
             combinedList.sort((a, b) => new Date(a.created_at || Date.now()) - new Date(b.created_at || Date.now()));
 
-            combinedList.forEach(msg => appendMessageToDOM(msg, false));
+            let lastDateLabel = '';
+            combinedList.forEach(msg => {
+                const msgDateLabel = formatDateDivider(msg.created_at || Date.now());
+                if (msgDateLabel !== lastDateLabel) {
+                    lastDateLabel = msgDateLabel;
+                    const divider = document.createElement('div');
+                    divider.className = 'flex items-center justify-center my-2';
+                    divider.innerHTML = `<span class="px-3 py-1 bg-slate-900 border border-slate-800 text-[10px] text-slate-400 rounded-full font-medium">${msgDateLabel}</span>`;
+                    container.appendChild(divider);
+                }
+                appendMessageToDOM(msg, false);
+            });
 
             container.scrollTop = container.scrollHeight;
         }
@@ -501,7 +471,6 @@
             const filtered = messagesCache.filter(m => {
                 if (m.is_deleted_for_everyone) return false;
                 if (m.message_type === 'text' && m.content.toLowerCase().includes(term)) return true;
-                if (m.message_type === keyword) return true;
                 return false;
             });
             renderMessages(filtered);
@@ -516,7 +485,6 @@
             if (msg.id) wrapper.setAttribute('data-id', msg.id);
 
             const isSelected = msg.id && selectedMessageIds.has(msg.id);
-
             const rowFlex = document.createElement('div');
             rowFlex.className = `flex items-center gap-2 max-w-[85%] ${isMe ? 'flex-row-reverse' : 'flex-row'}`;
 
@@ -524,10 +492,6 @@
             checkboxEl.className = `w-5 h-5 rounded-full border border-slate-600 flex items-center justify-center text-xs transition-all flex-shrink-0 ${isMultiSelectMode ? 'flex' : 'hidden'} ${isSelected ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-slate-900'}`;
             checkboxEl.innerHTML = isSelected ? '✓' : '';
             rowFlex.appendChild(checkboxEl);
-
-            if (isSelected) {
-                wrapper.classList.add('bg-indigo-950/30', 'p-2', 'rounded-xl');
-            }
 
             let pressTimer = null;
             const startPress = () => {
@@ -540,16 +504,12 @@
                     }
                 }, 600);
             };
-            const cancelPress = () => {
-                if (pressTimer) clearTimeout(pressTimer);
-            };
+            const cancelPress = () => { if (pressTimer) clearTimeout(pressTimer); };
 
             wrapper.addEventListener('touchstart', startPress);
             wrapper.addEventListener('touchend', cancelPress);
-            wrapper.addEventListener('touchmove', cancelPress);
             wrapper.addEventListener('mousedown', startPress);
             wrapper.addEventListener('mouseup', cancelPress);
-            wrapper.addEventListener('mouseleave', cancelPress);
 
             wrapper.addEventListener('click', (e) => {
                 if (isMultiSelectMode && msg.id) {
@@ -558,47 +518,8 @@
                 }
             });
 
-            wrapper.oncontextmenu = (e) => {
-                e.preventDefault();
-                if (!msg.is_offline_pending && msg.id) {
-                    if (!isMultiSelectMode) {
-                        openMessageOptions(msg);
-                    }
-                }
-            };
-
-            let touchStartX = 0;
-            let touchCurrentX = 0;
-
-            wrapper.addEventListener('touchstart', (e) => {
-                if (isMultiSelectMode) return;
-                touchStartX = e.touches[0].clientX;
-            }, { passive: true });
-
-            wrapper.addEventListener('touchmove', (e) => {
-                if (isMultiSelectMode) return;
-                touchCurrentX = e.touches[0].clientX;
-                const diff = touchCurrentX - touchStartX;
-                if (diff > 0 && diff < 100) {
-                    wrapper.style.transform = `translateX(${diff}px)`;
-                }
-            }, { passive: true });
-
-            wrapper.addEventListener('touchend', () => {
-                if (isMultiSelectMode) return;
-                const diff = touchCurrentX - touchStartX;
-                wrapper.style.transform = 'translateX(0px)';
-                if (diff > 60) {
-                    setReplyTarget(msg);
-                }
-                touchStartX = 0;
-                touchCurrentX = 0;
-            });
-
             const bubble = document.createElement('div');
-            bubble.className = `flex-1 px-3 py-2 rounded-2xl text-sm ${
-                isMe ? 'bg-indigo-600 text-white rounded-br-none' : 'bg-slate-800 text-slate-100 rounded-bl-none border border-slate-700/50'
-            }`;
+            bubble.className = `flex-1 px-3 py-2 rounded-2xl text-sm ${isMe ? 'bg-indigo-600 text-white rounded-br-none' : 'bg-slate-800 text-slate-100 rounded-bl-none border border-slate-700/50'}`;
 
             if (msg.reply_to) {
                 const replySnippet = document.createElement('div');
@@ -611,46 +532,11 @@
             const type = msg.message_type || 'text';
             
             if (type === 'image') {
-                contentBody.innerHTML = `<img src="${msg.content}" class="rounded-xl max-h-60 w-full object-cover cursor-pointer" onclick="if(!isMultiSelectMode) window.open('${msg.content}')">`;
+                contentBody.innerHTML = `<img src="${msg.content}" class="rounded-xl max-h-60 w-full object-cover cursor-pointer" onclick="window.open('${msg.content}')">`;
             } else if (type === 'video') {
                 contentBody.innerHTML = `<video src="${msg.content}" controls class="rounded-xl max-h-60 w-full"></video>`;
             } else if (type === 'audio') {
-                const audioId = 'audio_' + Math.random().toString(36).substring(2, 9);
-                contentBody.innerHTML = `
-                    <div class="flex items-center gap-2.5 py-1 px-1 min-w-[220px]" data-audio-container>
-                        <button type="button" onclick="if(!isMultiSelectMode) toggleAudioPlay('${audioId}', this)" class="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center text-xs font-bold transition-all flex-shrink-0 cursor-pointer">▶</button>
-                        <audio id="${audioId}" src="${msg.content}" preload="metadata"></audio>
-                        <div class="flex flex-col flex-1 gap-1">
-                            <div class="flex justify-between items-center text-[10px] opacity-80">
-                                <span class="audio-current-time">0:00</span>
-                                <button type="button" onclick="if(!isMultiSelectMode) toggleAudioSpeed('${audioId}', this)" class="bg-white/10 hover:bg-white/20 px-1.5 py-0.5 rounded font-mono text-[9px] cursor-pointer">1x</button>
-                            </div>
-                            <input type="range" value="0" max="100" step="0.1" oninput="seekAudio('${audioId}', this.value)" class="audio-range w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer accent-white">
-                        </div>
-                    </div>
-                `;
-
-                setTimeout(() => {
-                    const audioEl = document.getElementById(audioId);
-                    if (!audioEl) return;
-                    const c = audioEl.closest('[data-audio-container]');
-                    const rangeEl = c.querySelector('.audio-range');
-                    const timeEl = c.querySelector('.audio-current-time');
-
-                    audioEl.addEventListener('loadedmetadata', () => {
-                        timeEl.textContent = formatAudioTime(audioEl.duration);
-                    });
-                    audioEl.addEventListener('timeupdate', () => {
-                        if (!audioEl.duration) return;
-                        rangeEl.value = (audioEl.currentTime / audioEl.duration) * 100;
-                        timeEl.textContent = formatAudioTime(audioEl.currentTime);
-                    });
-                    audioEl.addEventListener('ended', () => {
-                        c.querySelector('button').textContent = '▶';
-                        audioEl.currentTime = 0;
-                    });
-                }, 50);
-
+                contentBody.innerHTML = `<audio src="${msg.content}" controls class="max-w-[200px] h-8"></audio>`;
             } else if (type === 'file') {
                 contentBody.innerHTML = `<a href="${msg.content}" target="_blank" download class="flex items-center gap-2 underline text-xs font-semibold py-1">📁 Download File Attachment</a>`;
             } else {
@@ -671,7 +557,6 @@
                 tickSpan.className = 'font-bold text-xs ';
                 if (msg.is_offline_pending) {
                     tickSpan.textContent = '🕒';
-                    tickSpan.title = 'Pending (Waiting for network)';
                 } else {
                     tickSpan.textContent = msg.is_read ? '✓✓' : '✓';
                     tickSpan.classList.add(msg.is_read ? 'text-indigo-300' : 'text-slate-500');
@@ -683,20 +568,75 @@
             wrapper.appendChild(metaRow);
             container.appendChild(wrapper);
 
-            if (scrollToBottom) {
-                container.scrollTop = container.scrollHeight;
+            if (scrollToBottom) container.scrollTop = container.scrollHeight;
+        }
+
+        // --- REAL-TIME TYPING & SYNCING ---
+        function handleTypingInput() {
+            if (!navigator.onLine) return;
+            supabaseClient.channel(`typing_${currentUser.username}_${targetUsername}`).send({
+                type: 'broadcast',
+                event: 'typing',
+                payload: { sender: currentUser.username }
+            });
+        }
+
+        function subscribeToRealtimeChannels() {
+            if (messageSubscription) supabaseClient.removeChannel(messageSubscription);
+            if (typingSubscription) supabaseClient.removeChannel(typingSubscription);
+
+            // Message Realtime Sync
+            messageSubscription = supabaseClient
+                .channel(`room_${currentUser.username}_${targetUsername}`)
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, payload => {
+                    fetchMessages();
+                })
+                .subscribe();
+
+            // Typing Indicator Broadcast
+            typingSubscription = supabaseClient
+                .channel(`typing_${targetUsername}_${currentUser.username}`)
+                .on('broadcast', { event: 'typing' }, payload => {
+                    if (payload.payload.sender === targetUsername) {
+                        const indicator = document.getElementById('typing-indicator');
+                        indicator.classList.remove('hidden');
+                        indicator.classList.add('flex');
+                        
+                        if (typingTimeout) clearTimeout(typingTimeout);
+                        typingTimeout = setTimeout(() => {
+                            indicator.classList.remove('flex');
+                            indicator.classList.add('hidden');
+                        }, 2000);
+                    }
+                })
+                .subscribe();
+        }
+
+        async function flushOfflineQueue() {
+            const queue = loadOfflineQueue();
+            if (queue.length === 0) return;
+
+            const remainingQueue = [];
+            for (const item of queue) {
+                const { error } = await supabaseClient.from('messages').insert([{
+                    sender_username: item.sender_username,
+                    receiver_username: item.receiver_username,
+                    content: item.content,
+                    message_type: item.message_type,
+                    reply_to: item.reply_to,
+                    is_read: false
+                }]);
+                if (error) remainingQueue.push(item);
             }
+            saveOfflineQueue(remainingQueue);
         }
 
         function enterMultiSelectMode(msg) {
             isMultiSelectMode = true;
             selectedMessageIds.clear();
-            if (msg && msg.id) {
-                selectedMessageIds.add(msg.id);
-            }
+            if (msg && msg.id) selectedMessageIds.add(msg.id);
             document.getElementById('multi-select-bar').classList.remove('hidden');
             document.getElementById('multi-select-bar').classList.add('flex');
-            updateMultiSelectUI();
             renderMessages(messagesCache);
         }
 
@@ -709,68 +649,63 @@
         }
 
         function toggleMessageSelection(msgId) {
-            if (selectedMessageIds.has(msgId)) {
-                selectedMessageIds.delete(msgId);
-            } else {
-                selectedMessageIds.add(msgId);
-            }
-
-            if (selectedMessageIds.size === 0) {
-                exitMultiSelectMode();
-                return;
-            }
-
-            updateMultiSelectUI();
+            if (selectedMessageIds.has(msgId)) selectedMessageIds.delete(msgId);
+            else selectedMessageIds.add(msgId);
+            if (selectedMessageIds.size === 0) { exitMultiSelectMode(); return; }
+            document.getElementById('selected-count-text').textContent = `${selectedMessageIds.size} selected`;
             renderMessages(messagesCache);
-        }
-
-        function updateMultiSelectUI() {
-            const countText = document.getElementById('selected-count-text');
-            countText.textContent = `${selectedMessageIds.size} selected`;
         }
 
         function deleteSelectedMessages() {
             if (selectedMessageIds.size === 0) return;
-
             let hiddenForMe = [];
-            try {
-                hiddenForMe = JSON.parse(localStorage.getItem(`chatlite_deleted_for_me_${currentUser.username}_${targetUsername}`) || '[]');
-            } catch(e) {}
-
-            const idsToDelete = Array.from(selectedMessageIds);
-            idsToDelete.forEach(id => {
-                if (!hiddenForMe.includes(id)) {
-                    hiddenForMe.push(id);
-                }
-            });
-
+            try { hiddenForMe = JSON.parse(localStorage.getItem(`chatlite_deleted_for_me_${currentUser.username}_${targetUsername}`) || '[]'); } catch(e) {}
+            
+            selectedMessageIds.forEach(id => { if (!hiddenForMe.includes(id)) hiddenForMe.push(id); });
             localStorage.setItem(`chatlite_deleted_for_me_${currentUser.username}_${targetUsername}`, JSON.stringify(hiddenForMe));
             
             exitMultiSelectMode();
             renderMessages(messagesCache);
+        }
 
-            showUndoBanner(10, () => {
-                fetchMessages();
-            });
+        function openMessageOptions(msg) {
+            const modal = document.getElementById('message-options-modal');
+            const actionsContainer = document.getElementById('message-options-actions');
+            actionsContainer.innerHTML = '';
+
+            const replyBtn = document.createElement('button');
+            replyBtn.className = 'w-full text-left px-3 py-2 text-xs font-medium text-slate-200 hover:bg-slate-800 rounded-xl cursor-pointer';
+            replyBtn.textContent = '↩️ Reply';
+            replyBtn.onclick = () => { closeMessageOptions(); setReplyTarget(msg); };
+            actionsContainer.appendChild(replyBtn);
+
+            const deleteForMeBtn = document.createElement('button');
+            deleteForMeBtn.className = 'w-full text-left px-3 py-2 text-xs font-medium text-slate-200 hover:bg-slate-800 rounded-xl cursor-pointer';
+            deleteForMeBtn.textContent = '🗑️ Delete for me';
+            deleteForMeBtn.onclick = () => {
+                closeMessageOptions();
+                let hiddenForMe = [];
+                try { hiddenForMe = JSON.parse(localStorage.getItem(`chatlite_deleted_for_me_${currentUser.username}_${targetUsername}`) || '[]'); } catch(e) {}
+                hiddenForMe.push(msg.id);
+                localStorage.setItem(`chatlite_deleted_for_me_${currentUser.username}_${targetUsername}`, JSON.stringify(hiddenForMe));
+                renderMessages(messagesCache);
+            };
+            actionsContainer.appendChild(deleteForMeBtn);
+
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeMessageOptions() {
+            document.getElementById('message-options-modal').classList.remove('flex');
+            document.getElementById('message-options-modal').classList.add('hidden');
         }
 
         function setReplyTarget(msg) {
-            if (isMultiSelectMode) return;
             replyingToMessage = msg;
             const replyBar = document.getElementById('reply-preview-bar');
-            const senderNameEl = document.getElementById('reply-target-sender');
-            const contentEl = document.getElementById('reply-target-content');
-
-            const senderLabel = msg.sender_username === currentUser.username ? 'You' : targetName;
-            senderNameEl.textContent = `Replying to ${senderLabel}`;
-            
-            let previewText = msg.content;
-            if (msg.message_type === 'image') previewText = '[Photo Attachment]';
-            else if (msg.message_type === 'video') previewText = '[Video Attachment]';
-            else if (msg.message_type === 'audio') previewText = '[Voice Note]';
-            else if (msg.message_type === 'file') previewText = '[File Attachment]';
-
-            contentEl.textContent = previewText;
+            document.getElementById('reply-target-sender').textContent = `Replying to ${msg.sender_username === currentUser.username ? 'You' : targetName}`;
+            document.getElementById('reply-target-content').textContent = msg.content;
             replyBar.classList.remove('hidden');
             replyBar.classList.add('flex');
             document.getElementById('message-input').focus();
@@ -778,477 +713,41 @@
 
         function cancelReply() {
             replyingToMessage = null;
-            const replyBar = document.getElementById('reply-preview-bar');
-            replyBar.classList.remove('flex');
-            replyBar.classList.add('hidden');
-        }
-
-        async function flushOfflineQueue() {
-            const queue = loadOfflineQueue();
-            if (queue.length === 0) return;
-
-            const remainingQueue = [];
-            for (const item of queue) {
-                const payload = {
-                    sender_username: item.sender_username,
-                    receiver_username: item.receiver_username,
-                    content: item.content,
-                    message_type: item.message_type,
-                    reply_to: item.reply_to,
-                    is_read: false
-                };
-
-                let { data, error } = await supabaseClient.from('messages').insert([payload]).select();
-
-                if (error && error.message && error.message.includes('message_type')) {
-                    const fallback = {
-                        sender_username: item.sender_username,
-                        receiver_username: item.receiver_username,
-                        content: item.content,
-                        is_read: false
-                    };
-                    const retry = await supabaseClient.from('messages').insert([fallback]).select();
-                    data = retry.data;
-                    error = retry.error;
-                }
-
-                if (error) {
-                    remainingQueue.push(item);
-                } else if (data && data.length > 0) {
-                    messagesCache.push(data[0]);
-                }
-            }
-
-            saveOfflineQueue(remainingQueue);
-            saveLocalCache(messagesCache);
-        }
-
-        window.addEventListener('online', async () => {
-            await fetchMessages();
-        });
-
-        function openMessageOptions(msg) {
-            if (isMultiSelectMode) return;
-            const modal = document.getElementById('message-options-modal');
-            const actionsContainer = document.getElementById('message-options-actions');
-            actionsContainer.innerHTML = '';
-
-            const isSender = msg.sender_username === currentUser.username;
-            const msgTime = new Date(msg.created_at).getTime();
-            const now = new Date().getTime();
-            const diffHours = (now - msgTime) / (1000 * 60 * 60);
-            const within3Hours = diffHours <= 3;
-
-            const replyBtn = document.createElement('button');
-            replyBtn.className = 'w-full text-left px-3 py-2 text-xs font-medium text-slate-200 hover:bg-slate-800 rounded-xl transition-all cursor-pointer';
-            replyBtn.textContent = '↩️ Reply';
-            replyBtn.onclick = () => {
-                closeMessageOptions();
-                setReplyTarget(msg);
-            };
-            actionsContainer.appendChild(replyBtn);
-
-            if (msg.message_type === 'text' && msg.content) {
-                const copyBtn = document.createElement('button');
-                copyBtn.className = 'w-full text-left px-3 py-2 text-xs font-medium text-slate-200 hover:bg-slate-800 rounded-xl transition-all cursor-pointer';
-                copyBtn.textContent = '📋 Copy';
-                copyBtn.onclick = () => {
-                    navigator.clipboard.writeText(msg.content);
-                    closeMessageOptions();
-                };
-                actionsContainer.appendChild(copyBtn);
-            }
-
-            const forwardBtn = document.createElement('button');
-            forwardBtn.className = 'w-full text-left px-3 py-2 text-xs font-medium text-slate-200 hover:bg-slate-800 rounded-xl transition-all cursor-pointer';
-            forwardBtn.textContent = '↗️ Forward';
-            forwardBtn.onclick = () => {
-                closeMessageOptions();
-                localStorage.setItem('chatlite_forward_payload', JSON.stringify({ content: msg.content, type: msg.message_type || 'text' }));
-                window.location.href = 'chatlist.html?forward=true';
-            };
-            actionsContainer.appendChild(forwardBtn);
-
-            const deleteForMeBtn = document.createElement('button');
-            deleteForMeBtn.className = 'w-full text-left px-3 py-2 text-xs font-medium text-slate-200 hover:bg-slate-800 rounded-xl transition-all cursor-pointer';
-            deleteForMeBtn.textContent = '🗑️ Delete for me';
-            deleteForMeBtn.onclick = () => {
-                closeMessageOptions();
-                executeDeleteMessage(msg, 'me');
-            };
-            actionsContainer.appendChild(deleteForMeBtn);
-
-            if (isSender && within3Hours) {
-                const deleteForEveryoneBtn = document.createElement('button');
-                deleteForEveryoneBtn.className = 'w-full text-left px-3 py-2 text-xs font-medium text-red-400 hover:bg-slate-800 rounded-xl transition-all cursor-pointer';
-                deleteForEveryoneBtn.textContent = '🗑️ Delete for everyone';
-                deleteForEveryoneBtn.onclick = () => {
-                    closeMessageOptions();
-                    executeDeleteMessage(msg, 'everyone');
-                };
-                actionsContainer.appendChild(deleteForEveryoneBtn);
-            }
-
-            modal.classList.remove('hidden');
-            modal.classList.add('flex');
-        }
-
-        function closeMessageOptions() {
-            const modal = document.getElementById('message-options-modal');
-            modal.classList.remove('flex');
-            modal.classList.add('hidden');
-        }
-
-        function executeDeleteMessage(msg, scope) {
-            undoTargetMessage = { msg, scope };
-
-            if (scope === 'me') {
-                let hiddenForMe = [];
-                try {
-                    hiddenForMe = JSON.parse(localStorage.getItem(`chatlite_deleted_for_me_${currentUser.username}_${targetUsername}`) || '[]');
-                } catch(e) {}
-                hiddenForMe.push(msg.id);
-                localStorage.setItem(`chatlite_deleted_for_me_${currentUser.username}_${targetUsername}`, JSON.stringify(hiddenForMe));
-            } else {
-                msg.is_deleted_for_everyone = true;
-            }
-            renderMessages(messagesCache);
-
-            showUndoBanner(10, async () => {
-                if (scope === 'everyone' && msg.id) {
-                    await supabaseClient
-                        .from('messages')
-                        .update({ is_deleted_for_everyone: true, content: '[Message deleted]', message_type: 'text' })
-                        .eq('id', msg.id);
-                }
-                fetchMessages();
-            });
-        }
-
-        function showUndoBanner(seconds, onComplete) {
-            const banner = document.getElementById('undo-banner');
-            const countdownEl = document.getElementById('undo-countdown');
-            banner.classList.remove('hidden');
-            banner.classList.add('flex');
-
-            let timeLeft = seconds;
-            countdownEl.textContent = timeLeft;
-
-            if (pendingDeleteTimer) clearInterval(pendingDeleteTimer);
-
-            pendingDeleteTimer = setInterval(() => {
-                timeLeft--;
-                countdownEl.textContent = timeLeft;
-                if (timeLeft <= 0) {
-                    clearInterval(pendingDeleteTimer);
-                    banner.classList.remove('flex');
-                    banner.classList.add('hidden');
-                    if (onComplete) onComplete();
-                }
-            }, 1000);
-        }
-
-        function triggerUndoAction() {
-            if (pendingDeleteTimer) clearInterval(pendingDeleteTimer);
-            const banner = document.getElementById('undo-banner');
-            banner.classList.remove('flex');
-            banner.classList.add('hidden');
-
-            if (undoTargetMessage) {
-                const { msg, scope } = undoTargetMessage;
-                if (scope === 'me') {
-                    let hiddenForMe = [];
-                    try {
-                        hiddenForMe = JSON.parse(localStorage.getItem(`chatlite_deleted_for_me_${currentUser.username}_${targetUsername}`) || '[]');
-                    } catch(e) {}
-                    hiddenForMe = hiddenForMe.filter(id => id !== msg.id);
-                    localStorage.setItem(`chatlite_deleted_for_me_${currentUser.username}_${targetUsername}`, JSON.stringify(hiddenForMe));
-                } else {
-                    msg.is_deleted_for_everyone = false;
-                }
-                renderMessages(messagesCache);
-                undoTargetMessage = null;
-            }
-        }
-
-        function toggleAudioPlay(audioId, btn) {
-            const audio = document.getElementById(audioId);
-            if (audio.paused) {
-                audio.play();
-                btn.textContent = '⏸';
-            } else {
-                audio.pause();
-                btn.textContent = '▶';
-            }
-        }
-
-        function seekAudio(audioId, value) {
-            const audio = document.getElementById(audioId);
-            if (!audio.duration) return;
-            audio.currentTime = (value / 100) * audio.duration;
-        }
-
-        function toggleAudioSpeed(audioId, speedBtn) {
-            const audio = document.getElementById(audioId);
-            let nextRate = audio.playbackRate === 1 ? 1.5 : audio.playbackRate === 1.5 ? 2 : 1;
-            audio.playbackRate = nextRate;
-            speedBtn.textContent = nextRate + 'x';
-        }
-
-        function formatAudioTime(secs) {
-            if (isNaN(secs)) return '0:00';
-            const mins = Math.floor(secs / 60);
-            const rSecs = Math.floor(secs % 60);
-            return `${mins}:${rSecs < 10 ? '0' : ''}${rSecs}`;
-        }
-
-        function stageFileSelected(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-
-            recordedFileStaged = file; 
-
-            const reader = new FileReader();
-            const progressBar = document.getElementById('upload-progress-bar');
-            const statusText = document.getElementById('upload-status-text');
-            document.getElementById('media-preview-bar').classList.remove('hidden');
-            document.getElementById('media-preview-bar').classList.add('flex');
-            
-            progressBar.style.width = '20%';
-            statusText.textContent = 'Staging file...';
-
-            reader.onload = function(e) {
-                progressBar.style.width = '100%';
-                statusText.textContent = 'Ready! Hit the Send button to upload to storage.';
-
-                let type = 'file';
-                if (file.type.startsWith('image/')) {
-                    type = 'image';
-                } else if (file.type.startsWith('video/')) {
-                    type = 'video';
-                } else if (file.type.startsWith('audio/')) {
-                    type = 'audio';
-                }
-
-                stagedPayload = {
-                    localPreview: e.target.result,
-                    type: type
-                };
-
-                const previewContainer = document.getElementById('preview-container');
-                if (type === 'image') {
-                    previewContainer.innerHTML = `<img src="${e.target.result}" class="max-h-20 rounded object-contain">`;
-                } else if (type === 'video') {
-                    previewContainer.innerHTML = `<video src="${e.target.result}" class="max-h-20 rounded" controls></video>`;
-                } else {
-                    previewContainer.innerHTML = `<span class="font-semibold">Staged File: ${file.name}</span>`;
-                }
-            };
-            reader.readAsDataURL(file);
-        }
-
-        function clearStagedMedia() {
-            stagedPayload = null;
-            recordedFileStaged = null;
-            document.getElementById('media-preview-bar').classList.add('hidden');
-            document.getElementById('media-preview-bar').classList.remove('flex');
-            document.getElementById('upload-progress-bar').style.width = '0%';
-        }
-
-        async function startVoiceRecording() {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                mediaRecorder = new MediaRecorder(stream);
-                audioChunks = [];
-
-                mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
-                mediaRecorder.onstop = () => {
-                    recordedFileStaged = new File(audioChunks, `voice_${Date.now()}.webm`, { type: 'audio/webm' });
-                };
-
-                mediaRecorder.start();
-                isRecording = true;
-                isPaused = false;
-                recordedFileStaged = null;
-
-                document.getElementById('message-input').classList.add('hidden');
-                document.getElementById('recording-ui').classList.remove('hidden');
-                document.getElementById('recording-ui').classList.add('flex');
-                document.getElementById('mic-btn').classList.add('hidden');
-
-                recordingSeconds = 0;
-                document.getElementById('recording-timer').textContent = '0:00';
-                recordingTimerInterval = setInterval(() => {
-                    if (!isPaused) {
-                        recordingSeconds++;
-                        const m = Math.floor(recordingSeconds / 60);
-                        const s = recordingSeconds % 60;
-                        document.getElementById('recording-timer').textContent = `${m}:${s < 10 ? '0' : ''}${s}`;
-                    }
-                }, 1000);
-            } catch (err) {
-                showCustomAlert('Error', 'Microphone access denied or unavailable.');
-            }
-        }
-
-        function togglePauseRecording() {
-            if (!mediaRecorder) return;
-            const btn = document.getElementById('pause-rec-btn');
-            if (!isPaused) {
-                mediaRecorder.pause();
-                isPaused = true;
-                btn.textContent = '▶ Resume';
-            } else {
-                mediaRecorder.resume();
-                isPaused = false;
-                btn.textContent = '⏸ Pause';
-            }
-        }
-
-        function stopRecordingOnly() {
-            if (mediaRecorder && isRecording) {
-                mediaRecorder.stop();
-                isRecording = false;
-                clearInterval(recordingTimerInterval);
-                
-                stagedPayload = {
-                    type: 'audio'
-                };
-
-                document.getElementById('media-preview-bar').classList.remove('hidden');
-                document.getElementById('media-preview-bar').classList.add('flex');
-                document.getElementById('preview-container').innerHTML = `<span class="text-indigo-400 font-bold text-xs">Voice Note Recorded (${recordingSeconds}s). Ready to Send.</span>`;
-                document.getElementById('upload-progress-bar').style.width = '100%';
-                document.getElementById('upload-status-text').textContent = 'Hit the Send button to upload voice note.';
-            }
-        }
-
-        function cancelRecording() {
-            if (mediaRecorder && (isRecording || isPaused)) {
-                mediaRecorder.ondataavailable = null;
-                mediaRecorder.stop();
-            }
-            resetRecordingUI();
-            clearStagedMedia();
-        }
-
-        function resetRecordingUI() {
-            clearInterval(recordingTimerInterval);
-            isRecording = false;
-            isPaused = false;
-            document.getElementById('recording-ui').classList.add('hidden');
-            document.getElementById('recording-ui').classList.remove('flex');
-            document.getElementById('message-input').classList.remove('hidden');
-            document.getElementById('mic-btn').classList.remove('hidden');
+            document.getElementById('reply-preview-bar').classList.remove('flex');
+            document.getElementById('reply-preview-bar').classList.add('hidden');
         }
 
         async function handleFormSubmit(e) {
             e.preventDefault();
-
-            if (isRecording) {
-                stopRecordingOnly();
-                return;
-            }
-
-            let replyMeta = null;
-            if (replyingToMessage) {
-                replyMeta = {
-                    sender: replyingToMessage.sender_username === currentUser.username ? 'You' : targetName,
-                    content: replyingToMessage.message_type === 'text' ? replyingToMessage.content : `[${replyingToMessage.message_type}]`
-                };
-            }
-
-            if (recordedFileStaged || stagedPayload) {
-                const fileToUpload = recordedFileStaged;
-                let fileType = stagedPayload ? stagedPayload.type : 'audio';
-
-                if (!fileToUpload) {
-                    showCustomAlert('Error', 'Please re-attach the file.');
-                    return;
-                }
-
-                const progressBar = document.getElementById('upload-progress-bar');
-                const statusText = document.getElementById('upload-status-text');
-                statusText.textContent = 'Uploading to storage bucket...';
-                progressBar.style.width = '50%';
-
-                const fileName = `${currentUser.username}_${Date.now()}_${fileToUpload.name || 'media.webm'}`;
-                const { data: uploadData, error: uploadError } = await supabaseClient.storage
-                    .from('chat-media')
-                    .upload(fileName, fileToUpload);
-
-                if (uploadError) {
-                    showCustomAlert('Upload Failed', 'Failed to upload file to storage: ' + uploadError.message);
-                    clearStagedMedia();
-                    return;
-                }
-
-                const { data: publicUrlData } = supabaseClient.storage
-                    .from('chat-media')
-                    .getPublicUrl(fileName);
-
-                const publicUrl = publicUrlData.publicUrl;
-                progressBar.style.width = '100%';
-
-                await sendPayloadToSupabase(publicUrl, fileType, replyMeta);
-                recordedFileStaged = null;
-                resetRecordingUI();
-                clearStagedMedia();
-                cancelReply();
-                return;
-            }
-
             const input = document.getElementById('message-input');
             const content = input.value.trim();
             if (!content) return;
 
             input.value = '';
-            await sendPayloadToSupabase(content, 'text', replyMeta);
-            cancelReply();
-        }
+            let replyMeta = replyingToMessage ? { sender: replyingToMessage.sender_username === currentUser.username ? 'You' : targetName, content: replyingToMessage.content } : null;
 
-        async function sendPayloadToSupabase(content, type, replyMeta = null) {
             const payload = {
                 sender_username: currentUser.username,
                 receiver_username: targetUsername,
                 content: content,
-                message_type: type,
+                message_type: 'text',
                 reply_to: replyMeta,
                 is_read: false,
                 created_at: new Date().toISOString()
             };
 
+            cancelReply();
+
             if (!navigator.onLine) {
-                const offlineQueue = loadOfflineQueue();
-                const pendingItem = { ...payload, is_offline_pending: true };
-                offlineQueue.push(pendingItem);
-                saveOfflineQueue(offlineQueue);
+                const queue = loadOfflineQueue();
+                queue.push({ ...payload, is_offline_pending: true });
+                saveOfflineQueue(queue);
                 renderMessages(messagesCache);
                 return;
             }
 
-            let { data, error } = await supabaseClient.from('messages').insert([payload]).select();
-
-            if (error && error.message && (error.message.includes('message_type') || error.message.includes('reply_to'))) {
-                const fallback = {
-                    sender_username: currentUser.username,
-                    receiver_username: targetUsername,
-                    content: content,
-                    is_read: false,
-                    created_at: new Date().toISOString()
-                };
-                const retry = await supabaseClient.from('messages').insert([fallback]).select();
-                data = retry.data;
-                error = retry.error;
-            }
-
-            if (error) {
-                console.error('Error sending message:', error);
-                const offlineQueue = loadOfflineQueue();
-                offlineQueue.push({ ...payload, is_offline_pending: true });
-                saveOfflineQueue(offlineQueue);
-                renderMessages(messagesCache);
-            } else if (data && data.length > 0) {
+            const { data, error } = await supabaseClient.from('messages').insert([payload]).select();
+            if (!error && data && data.length > 0) {
                 messagesCache.push(data[0]);
                 saveLocalCache(messagesCache);
                 renderMessages(messagesCache);
@@ -1258,34 +757,19 @@
         function openMediaGallery(typeFilter) {
             const modal = document.getElementById('media-gallery-modal');
             const grid = document.getElementById('gallery-content-grid');
-            const title = document.getElementById('gallery-title');
             modal.classList.remove('hidden');
             grid.innerHTML = '';
-            title.textContent = `${typeFilter.toUpperCase()} Gallery`;
 
-            const matching = messagesCache.filter(m => {
-                if (m.is_deleted_for_everyone) return false;
-                if (typeFilter === 'image' && m.message_type === 'image') return true;
-                if (typeFilter === 'video' && m.message_type === 'video') return true;
-                if (typeFilter === 'file' && (m.message_type === 'file' || m.message_type === 'audio')) return true;
-                return false;
-            });
-
+            const matching = messagesCache.filter(m => !m.is_deleted_for_everyone && m.message_type === typeFilter);
             if (matching.length === 0) {
-                grid.innerHTML = `<span class="text-xs text-slate-500 col-span-2 text-center py-6">No ${typeFilter}s found in this chat.</span>`;
+                grid.innerHTML = `<span class="text-xs text-slate-500 col-span-2 text-center py-6">No ${typeFilter}s found.</span>`;
                 return;
             }
 
             matching.forEach(m => {
                 const card = document.createElement('div');
-                card.className = 'bg-slate-900 border border-slate-800 rounded-lg p-2 flex flex-col items-center justify-center gap-2';
-                if (m.message_type === 'image') {
-                    card.innerHTML = `<img src="${m.content}" class="h-24 w-full object-cover rounded cursor-pointer" onclick="window.open('${m.content}')">`;
-                } else if (m.message_type === 'video') {
-                    card.innerHTML = `<video src="${m.content}" class="h-24 w-full rounded object-cover" controls></video>`;
-                } else {
-                    card.innerHTML = `<a href="${m.content}" target="_blank" download class="text-xs text-indigo-400 underline font-semibold py-4">Download ${m.message_type}</a>`;
-                }
+                card.className = 'bg-slate-900 border border-slate-800 rounded-lg p-2 flex flex-col items-center justify-center';
+                card.innerHTML = `<img src="${m.content}" class="h-24 w-full object-cover rounded cursor-pointer" onclick="window.open('${m.content}')">`;
                 grid.appendChild(card);
             });
         }
@@ -1294,35 +778,28 @@
             document.getElementById('media-gallery-modal').classList.add('hidden');
         }
 
-        function subscribeToMessages() {
-            if (messageSubscription) {
-                supabaseClient.removeChannel(messageSubscription);
-            }
-
-            messageSubscription = supabaseClient
-                .channel('public:messages')
-                .on(
-                    'postgres_changes',
-                    {
-                        event: 'INSERT',
-                        schema: 'public',
-                        table: 'messages'
-                    },
-                    payload => {
-                        const newMsg = payload.new;
-                        if (
-                            (newMsg.sender_username === targetUsername && newMsg.receiver_username === currentUser.username) ||
-                            (newMsg.sender_username === currentUser.username && newMsg.receiver_username === targetUsername)
-                        ) {
-                            fetchMessages();
-                        }
-                    }
-                )
-                .subscribe();
+        function stageFileSelected(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            recordedFileStaged = file;
+            document.getElementById('media-preview-bar').classList.remove('hidden');
+            document.getElementById('media-preview-bar').classList.add('flex');
+            document.getElementById('preview-container').innerHTML = `<span class="text-xs">Staged: ${file.name}</span>`;
         }
 
+        function clearStagedMedia() {
+            recordedFileStaged = null;
+            document.getElementById('media-preview-bar').classList.add('hidden');
+            document.getElementById('media-preview-bar').classList.remove('flex');
+        }
+
+        function startVoiceRecording() {}
+        function stopRecordingOnly() {}
+        function togglePauseRecording() {}
+        function cancelRecording() {}
+
         fetchMessages();
-        subscribeToMessages();
+        subscribeToRealtimeChannels();
     </script>
 </body>
 </html>

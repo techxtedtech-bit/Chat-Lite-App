@@ -862,7 +862,29 @@
                 return;
             }
 
-            filtered.forEach(msg => appendMessageToDOM(msg, false));
+            // Date Divider Grouping Logic
+            let lastDateLabel = null;
+
+            filtered.forEach(msg => {
+                const msgDate = new Date(msg.created_at || Date.now());
+                const dateString = msgDate.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+                const todayStr = new Date().toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+                const yesterdayStr = new Date(Date.now() - 86400000).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+
+                let displayDateLabel = dateString;
+                if (dateString === todayStr) displayDateLabel = 'Today';
+                else if (dateString === yesterdayStr) displayDateLabel = 'Yesterday';
+
+                if (displayDateLabel !== lastDateLabel) {
+                    lastDateLabel = displayDateLabel;
+                    const dateDivider = document.createElement('div');
+                    dateDivider.className = 'flex items-center justify-center my-3';
+                    dateDivider.innerHTML = `<span class="text-[10px] font-semibold bg-slate-900 border border-slate-800 text-slate-400 px-3 py-1 rounded-full uppercase tracking-wider">${displayDateLabel}</span>`;
+                    chatContainer.appendChild(dateDivider);
+                }
+
+                appendMessageToDOM(msg, false);
+            });
 
             const queue = getGroupOfflineQueue();
             queue.forEach(qMsg => appendMessageToDOM(qMsg, false));
