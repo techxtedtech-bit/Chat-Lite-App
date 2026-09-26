@@ -754,7 +754,7 @@
             btnEl.textContent = `${newRate}x`;
         }
 
-        // --- OPTIMIZED REAL-TIME INSTANT MESSAGE DROPPING ---
+        // --- SCOPED REAL-TIME INSTANT MESSAGE LISTENER ---
         function handleTypingInput() {
             if (!navigator.onLine) return;
             supabaseClient.channel(`typing_${currentUser.username}_${targetUsername}`).send({
@@ -768,37 +768,38 @@
             if (messageSubscription) supabaseClient.removeChannel(messageSubscription);
             if (typingSubscription) supabaseClient.removeChannel(typingSubscription);
 
-            // Instant Real-Time Message Insert Listener (Subscribes to global public.messages table changes)
+            // Scoped Real-Time Message Insert Listener for the active conversation
             messageSubscription = supabaseClient
-                .channel('public:messages')
-                .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, payload => {
-                    const newMsg = payload.new;
-                    const isRelevant = (
-                        (newMsg.sender_username === targetUsername && newMsg.receiver_username === currentUser.username) ||
-                        (newMsg.sender_username === currentUser.username && newMsg.receiver_username === targetUsername)
-                    );
-
-                    if (isRelevant) {
-                        // Prevent duplicate entries if already added locally
-                        if (!messagesCache.some(m => m.id === newMsg.id)) {
-                            messagesCache.push(newMsg);
+                .channel(`room_${currentUser.username}_${targetUsername}`)
+                .on(
+                    'postgres_changes', 
+                    { 
+                        event: 'INSERT', 
+                        schema: 'public', 
+                        table: 'messages',
+                        filter: `receiver_username=eq.${currentUser.username}`
+                    }, 
+                    payload => {
+                        handleIncomingRealtimeMessage(payload.new);
+                    }
+                )
+                .on(
+                    'postgres_changes', 
+                    { 
+                        event: 'UPDATE', 
+                        schema: 'public', 
+                        table: 'messages' 
+                    }, 
+                    payload => {
+                        const updatedMsg = payload.new;
+                        const index = messagesCache.findIndex(m => m.id === updatedMsg.id);
+                        if (index !== -1) {
+                            messagesCache[index] = updatedMsg;
                             saveLocalCache(messagesCache);
                             renderMessages(messagesCache);
-                            if (newMsg.receiver_username === currentUser.username) {
-                                markIncomingMessagesAsRead([newMsg]);
-                            }
                         }
                     }
-                })
-                .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages' }, payload => {
-                    const updatedMsg = payload.new;
-                    const index = messagesCache.findIndex(m => m.id === updatedMsg.id);
-                    if (index !== -1) {
-                        messagesCache[index] = updatedMsg;
-                        saveLocalCache(messagesCache);
-                        renderMessages(messagesCache);
-                    }
-                })
+                )
                 .subscribe();
 
             // Typing Indicator Broadcast
@@ -818,6 +819,24 @@
                     }
                 })
                 .subscribe();
+        }
+
+        function handleIncomingRealtimeMessage(newMsg) {
+            const isRelevant = (
+                (newMsg.sender_username === targetUsername && newMsg.receiver_username === currentUser.username) ||
+                (newMsg.sender_username === currentUser.username && newMsg.receiver_username === targetUsername)
+            );
+
+            if (isRelevant) {
+                if (!messagesCache.some(m => m.id === newMsg.id)) {
+                    messagesCache.push(newMsg);
+                    saveLocalCache(messagesCache);
+                    renderMessages(messagesCache);
+                    if (newMsg.receiver_username === currentUser.username) {
+                        markIncomingMessagesAsRead([newMsg]);
+                    }
+                }
+            }
         }
 
         async function flushOfflineQueue() {
