@@ -754,7 +754,7 @@
             btnEl.textContent = `${newRate}x`;
         }
 
-        // --- FIXED REAL-TIME INSTANT MESSAGE DROPPING ---
+        // --- OPTIMIZED REAL-TIME INSTANT MESSAGE DROPPING ---
         function handleTypingInput() {
             if (!navigator.onLine) return;
             supabaseClient.channel(`typing_${currentUser.username}_${targetUsername}`).send({
@@ -768,9 +768,9 @@
             if (messageSubscription) supabaseClient.removeChannel(messageSubscription);
             if (typingSubscription) supabaseClient.removeChannel(typingSubscription);
 
-            // Instant Real-Time Message Insert Listener
+            // Instant Real-Time Message Insert Listener (Subscribes to global public.messages table changes)
             messageSubscription = supabaseClient
-                .channel(`room_${currentUser.username}_${targetUsername}`)
+                .channel('public:messages')
                 .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, payload => {
                     const newMsg = payload.new;
                     const isRelevant = (
@@ -779,7 +779,7 @@
                     );
 
                     if (isRelevant) {
-                        // Prevent duplicate if already added locally
+                        // Prevent duplicate entries if already added locally
                         if (!messagesCache.some(m => m.id === newMsg.id)) {
                             messagesCache.push(newMsg);
                             saveLocalCache(messagesCache);
@@ -788,6 +788,15 @@
                                 markIncomingMessagesAsRead([newMsg]);
                             }
                         }
+                    }
+                })
+                .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages' }, payload => {
+                    const updatedMsg = payload.new;
+                    const index = messagesCache.findIndex(m => m.id === updatedMsg.id);
+                    if (index !== -1) {
+                        messagesCache[index] = updatedMsg;
+                        saveLocalCache(messagesCache);
+                        renderMessages(messagesCache);
                     }
                 })
                 .subscribe();
@@ -1049,9 +1058,12 @@
 
             const { data, error } = await supabaseClient.from('messages').insert([payload]).select();
             if (!error && data && data.length > 0) {
-                messagesCache.push(data[0]);
-                saveLocalCache(messagesCache);
-                renderMessages(messagesCache);
+                // Instantly append to local cache and render to prevent waiting on network echo delay
+                if (!messagesCache.some(m => m.id === data[0].id)) {
+                    messagesCache.push(data[0]);
+                    saveLocalCache(messagesCache);
+                    renderMessages(messagesCache);
+                }
             }
         }
 
@@ -1134,9 +1146,11 @@
 
             const { data, error } = await supabaseClient.from('messages').insert([payload]).select();
             if (!error && data && data.length > 0) {
-                messagesCache.push(data[0]);
-                saveLocalCache(messagesCache);
-                renderMessages(messagesCache);
+                if (!messagesCache.some(m => m.id === data[0].id)) {
+                    messagesCache.push(data[0]);
+                    saveLocalCache(messagesCache);
+                    renderMessages(messagesCache);
+                }
             }
 
             clearStagedMedia();
