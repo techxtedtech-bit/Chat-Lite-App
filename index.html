@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat Lite - Welcome</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,700&display=swap" rel="stylesheet">
+    <style>
+        @keyframes welcomeSwirl {
+            0% {
+                opacity: 0;
+                transform: scale(0.5) rotate(-10deg) translateY(20px);
+                filter: blur(10px);
+            }
+            60% {
+                opacity: 1;
+                transform: scale(1.05) rotate(3deg) translateY(-5px);
+                filter: blur(0px);
+            }
+            100% {
+                opacity: 1;
+                transform: scale(1) rotate(0deg) translateY(0);
+                filter: blur(0px);
+            }
+        }
+        .animate-swirl {
+            animation: welcomeSwirl 1.2s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+        }
+
+        body {
+            background-color: #020617;
+            color: #f1f5f9;
+            margin: 0;
+            font-family: ui-sans-serif, system-ui, sans-serif;
+            min-height: 100vh;
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 font-sans">
+
+    <div class="min-h-screen flex flex-col w-full max-w-md mx-auto relative shadow-2xl bg-slate-900 border-x border-slate-800">
+        
+        <!-- Background Image Container with gradient overlay -->
+        <div class="absolute inset-0 bg-slate-950 bg-cover bg-center" style="background-image: url('image1-bg.jpg'); z-index: 0;">
+            <div class="absolute inset-0" style="background: linear-gradient(to bottom, rgba(2, 6, 23, 0.2) 0%, rgba(2, 6, 23, 0.7) 40%, rgba(2, 6, 23, 0.98) 85%, rgba(2, 6, 23, 1) 100%);"></div>
+        </div>
+
+        <!-- Content Area: Grouped at the bottom to sit right above the buttons -->
+        <div class="relative z-10 flex flex-col justify-end flex-1 p-6 pb-10 min-h-screen space-y-5">
+            
+            <!-- Top Header & Text Section (Pushed down near buttons) -->
+            <div class="space-y-4 text-left">
+                <div class="text-left w-full pb-1 overflow-hidden">
+                    <h2 class="text-5xl tracking-wide text-white drop-shadow-md animate-swirl inline-block" style="font-family: 'Playfair Display', serif; font-style: italic; font-weight: 700;">
+                        CHAT<span class="text-orange-500">lite</span>
+                    </h2>
+                </div>
+                <h1 class="text-3xl font-extrabold tracking-tight text-white leading-tight">
+                    Take control of your conversations, effortlessly.
+                </h1>
+                <p class="text-slate-300 text-sm leading-relaxed">
+                    Your private, secure family messaging space built just for you and your loved ones.
+                </p>
+            </div>
+
+            <!-- Bottom Action Group: Indicators + Side-by-Side Buttons -->
+            <div class="space-y-4 pt-2">
+                <!-- Pagination Dots Indicator -->
+                <div class="flex items-center space-x-1.5">
+                    <span class="h-1.5 w-1.5 rounded-full bg-slate-600"></span>
+                    <span class="h-1.5 w-6 rounded-full bg-orange-500"></span>
+                    <span class="h-1.5 w-1.5 rounded-full bg-slate-600"></span>
+                </div>
+
+                <!-- Side-by-Side Action Buttons -->
+                <div class="grid grid-cols-2 gap-3 w-full">
+                    <button onclick="window.location.href='register.html'" class="w-full py-4 px-4 bg-slate-800/80 hover:bg-slate-800 text-white font-semibold rounded-xl border border-slate-700/60 backdrop-blur-md transition-all text-center cursor-pointer shadow-lg">
+                        Create Profile
+                    </button>
+                    <button onclick="openLoginModal()" class="w-full py-4 px-4 bg-orange-600 hover:bg-orange-500 text-white font-semibold rounded-xl shadow-lg shadow-orange-600/30 transition-all text-center cursor-pointer">
+                        Access Chats
+                    </button>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Login Popup Modal (Hidden by default) -->
+        <div id="login-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md hidden items-center justify-center p-4 z-50">
+            <div class="bg-slate-900/90 border border-white/15 backdrop-blur-xl rounded-2xl w-full max-w-sm p-6 space-y-5 shadow-2xl">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-lg font-bold text-white tracking-wide">Access Chats</h3>
+                    <button onclick="closeLoginModal()" class="text-slate-400 hover:text-white text-xl cursor-pointer">&times;</button>
+                </div>
+                <form onsubmit="handleLogin(event)" autocomplete="off" class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-300 mb-1">Username</label>
+                        <input type="text" id="login-username" autocomplete="off" required class="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:border-orange-500 focus:bg-white/10 text-sm text-white backdrop-blur-md transition-all shadow-inner">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-300 mb-1">Password</label>
+                        <input type="password" id="login-password" autocomplete="new-password" required class="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:border-orange-500 focus:bg-white/10 text-sm text-white backdrop-blur-md transition-all shadow-inner">
+                    </div>
+                    <button type="submit" class="w-full py-3.5 bg-orange-600 hover:bg-orange-500 font-semibold rounded-xl shadow-lg shadow-orange-600/30 transition-all mt-2 cursor-pointer text-white">
+                        Sign In &rarr;
+                    </button>
+                </form>
+            </div>
+        </div>
+
+    </div>
+
+    <script src="supabase.js"></script>
+    <script>
+        function openLoginModal() {
+            const modal = document.getElementById('login-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeLoginModal() {
+            const modal = document.getElementById('login-modal');
+            modal.classList.remove('flex');
+            modal.classList.add('hidden');
+        }
+
+        async function handleLogin(e) {
+            e.preventDefault();
+            const username = document.getElementById('login-username').value.trim().toLowerCase();
+            const password = document.getElementById('login-password').value;
+
+            try {
+                const { data, error } = await supabaseClient
+                    .from('profiles')
+                    .select('*')
+                    .eq('username', username)
+                    .eq('password', password)
+                    .maybeSingle();
+
+                if (error || !data) {
+                    alert('Invalid username or password.');
+                    return;
+                }
+
+                localStorage.setItem('chatlite_user', JSON.stringify(data));
+                window.location.href = 'chatlist.html';
+            } catch (err) {
+                alert('An error occurred during login. Please check your connection.');
+            }
+        }
+    </script>
+</body>
+</html>
