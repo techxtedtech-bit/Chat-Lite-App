@@ -502,8 +502,11 @@
             checkboxEl.innerHTML = isSelected ? '✓' : '';
             rowFlex.appendChild(checkboxEl);
 
+            // Prevent native browser callouts/long-press menus
+            wrapper.addEventListener('contextmenu', (e) => e.preventDefault());
+
             let pressTimer = null;
-            const startPress = () => {
+            const startPress = (e) => {
                 if (msg.is_offline_pending) return; 
                 pressTimer = setTimeout(() => {
                     if (isMultiSelectMode) {
@@ -511,12 +514,13 @@
                     } else {
                         openMessageOptions(msg);
                     }
-                }, 600);
+                }, 500);
             };
             const cancelPress = () => { if (pressTimer) clearTimeout(pressTimer); };
 
-            wrapper.addEventListener('touchstart', startPress);
+            wrapper.addEventListener('touchstart', startPress, {passive: true});
             wrapper.addEventListener('touchend', cancelPress);
+            wrapper.addEventListener('touchmove', cancelPress);
             wrapper.addEventListener('mousedown', startPress);
             wrapper.addEventListener('mouseup', cancelPress);
 
@@ -682,12 +686,38 @@
             const actionsContainer = document.getElementById('message-options-actions');
             actionsContainer.innerHTML = '';
 
+            // Reply option
             const replyBtn = document.createElement('button');
             replyBtn.className = 'w-full text-left px-3 py-2 text-xs font-medium text-slate-200 hover:bg-slate-800 rounded-xl cursor-pointer';
             replyBtn.textContent = '↩️ Reply';
             replyBtn.onclick = () => { closeMessageOptions(); setReplyTarget(msg); };
             actionsContainer.appendChild(replyBtn);
 
+            // Copy option (for text messages)
+            if (msg.message_type === 'text' || !msg.message_type) {
+                const copyBtn = document.createElement('button');
+                copyBtn.className = 'w-full text-left px-3 py-2 text-xs font-medium text-slate-200 hover:bg-slate-800 rounded-xl cursor-pointer';
+                copyBtn.textContent = '📋 Copy Text';
+                copyBtn.onclick = () => {
+                    closeMessageOptions();
+                    navigator.clipboard.writeText(msg.content);
+                    showCustomAlert('Copied', 'Message copied to clipboard!');
+                };
+                actionsContainer.appendChild(copyBtn);
+            }
+
+            // Forward option
+            const forwardBtn = document.createElement('button');
+            forwardBtn.className = 'w-full text-left px-3 py-2 text-xs font-medium text-slate-200 hover:bg-slate-800 rounded-xl cursor-pointer';
+            forwardBtn.textContent = '↗️ Forward';
+            forwardBtn.onclick = () => {
+                closeMessageOptions();
+                document.getElementById('message-input').value = msg.content;
+                document.getElementById('message-input').focus();
+            };
+            actionsContainer.appendChild(forwardBtn);
+
+            // Delete for me
             const deleteForMeBtn = document.createElement('button');
             deleteForMeBtn.className = 'w-full text-left px-3 py-2 text-xs font-medium text-slate-200 hover:bg-slate-800 rounded-xl cursor-pointer';
             deleteForMeBtn.textContent = '🗑️ Delete for me';
@@ -700,6 +730,30 @@
                 renderMessages(messagesCache);
             };
             actionsContainer.appendChild(deleteForMeBtn);
+
+            // Delete for everyone (only if sender is current user and message has an ID)
+            if (msg.sender_username === currentUser.username && msg.id) {
+                const deleteEveryoneBtn = document.createElement('button');
+                deleteEveryoneBtn.className = 'w-full text-left px-3 py-2 text-xs font-medium text-red-400 hover:bg-red-500/10 rounded-xl cursor-pointer';
+                deleteEveryoneBtn.textContent = '🚫 Delete for everyone';
+                deleteEveryoneBtn.onclick = async () => {
+                    closeMessageOptions();
+                    if (navigator.onLine) {
+                        const { error } = await supabaseClient
+                            .from('messages')
+                            .update({ is_deleted_for_everyone: true })
+                            .eq('id', msg.id);
+                        if (!error) {
+                            fetchMessages();
+                        } else {
+                            showCustomAlert('Error', 'Could not delete message for everyone.');
+                        }
+                    } else {
+                        showCustomAlert('Offline', 'Internet connection required to delete for everyone.');
+                    }
+                };
+                actionsContainer.appendChild(deleteEveryoneBtn);
+            }
 
             modal.classList.remove('hidden');
             modal.classList.add('flex');
@@ -730,6 +784,12 @@
             e.preventDefault();
             const input = document.getElementById('message-input');
             const content = input.value.trim();
+
+            if (recordedFileStaged) {
+                await uploadStagedMediaAndSend();
+                return;
+            }
+
             if (!content) return;
 
             input.value = '';
@@ -752,13 +812,6 @@
                 queue.push({ ...payload, is_offline_pending: true });
                 saveOfflineQueue(queue);
                 renderMessages(messagesCache);
-                
-                // Trigger background sync if supported
-                if ('serviceWorker' in navigator && 'SyncManager' in window) {
-                    navigator.serviceWorker.ready.then(swRegistration => {
-                        return swRegistration.sync.register('sync-messages');
-                    }).catch(err => console.log('Background sync registration failed:', err));
-                }
                 return;
             }
 
@@ -768,6 +821,189 @@
                 saveLocalCache(messagesCache);
                 renderMessages(messagesCache);
             }
+        }
+
+        // --- MEDIA UPLOAD FIX & STAGING PIPELINE ---
+        function stageFileSelected(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            recordedFileStaged = file;
+            document.getElementById('media-preview-bar').classList.remove('hidden');
+            document.getElementById('media-preview-bar').classList.add('flex');
+            
+            let previewHTML = `<span class="text-xs">Staged File: ${file.name}</span>`;
+            if (file.type.startsWith('image/')) {
+                previewHTML = `<img src="${URL.createObjectURL(file)}" class="h-20 rounded object-cover">`;
+            } else if (file.type.startsWith('video/')) {
+                previewHTML = `<video src="${URL.createObjectURL(file)}" class="h-20 rounded object-cover"></video>`;
+            } else if (file.type.startsWith('audio/')) {
+                previewHTML = `<audio src="${URL.createObjectURL(file)}" controls class="h-8"></audio>`;
+            }
+            document.getElementById('preview-container').innerHTML = previewHTML;
+            document.getElementById('upload-status-text').textContent = "Ready. Hit Send button to upload & deliver.";
+            document.getElementById('upload-progress-bar').style.width = '0%';
+        }
+
+        function clearStagedMedia() {
+            recordedFileStaged = null;
+            document.getElementById('media-preview-bar').classList.add('hidden');
+            document.getElementById('media-preview-bar').classList.remove('flex');
+            document.getElementById('upload-progress-bar').style.width = '0%';
+        }
+
+        async function uploadStagedMediaAndSend() {
+            if (!recordedFileStaged) return;
+            const file = recordedFileStaged;
+            const progressBar = document.getElementById('upload-progress-bar');
+            const statusText = document.getElementById('upload-status-text');
+
+            statusText.textContent = "Uploading media to storage...";
+            progressBar.style.width = '30%';
+
+            const fileExt = file.name.split('.').pop() || 'bin';
+            const fileName = `${Date.now()}_${Math.random().toString(36).substring(2)}.${fileExt}`;
+            const filePath = `${currentUser.username}/${fileName}`;
+
+            let messageType = 'file';
+            if (file.type.startsWith('image/')) messageType = 'image';
+            else if (file.type.startsWith('video/')) messageType = 'video';
+            else if (file.type.startsWith('audio/')) messageType = 'audio';
+
+            const { data: uploadData, error: uploadError } = await supabaseClient.storage
+                .from('chat-media')
+                .upload(filePath, file);
+
+            if (uploadError) {
+                statusText.textContent = "Upload failed. Try again.";
+                showCustomAlert("Upload Error", uploadError.message);
+                return;
+            }
+
+            progressBar.style.width = '70%';
+            statusText.textContent = "Finalizing secure link...";
+
+            const { data: publicUrlData } = supabaseClient.storage
+                .from('chat-media')
+                .getPublicUrl(filePath);
+
+            const publicUrl = publicUrlData.publicUrl;
+            progressBar.style.width = '100%';
+
+            let replyMeta = replyingToMessage ? { sender: replyingToMessage.sender_username === currentUser.username ? 'You' : targetName, content: replyingToMessage.content } : null;
+
+            const payload = {
+                sender_username: currentUser.username,
+                receiver_username: targetUsername,
+                content: publicUrl,
+                message_type: messageType,
+                reply_to: replyMeta,
+                is_read: false,
+                created_at: new Date().toISOString()
+            };
+
+            const { data, error } = await supabaseClient.from('messages').insert([payload]).select();
+            if (!error && data && data.length > 0) {
+                messagesCache.push(data[0]);
+                saveLocalCache(messagesCache);
+                renderMessages(messagesCache);
+            }
+
+            clearStagedMedia();
+            cancelReply();
+        }
+
+        // --- VOICE NOTE RECORDING IMPLEMENTATION ---
+        async function startVoiceRecording() {
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                showCustomAlert("Not Supported", "Audio recording is not supported on this browser.");
+                return;
+            }
+
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+
+                mediaRecorder.ondataavailable = (event) => {
+                    if (event.data.size > 0) audioChunks.push(event.data);
+                };
+
+                mediaRecorder.onstop = () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    recordedFileStaged = new File([audioBlob], `voice_note_${Date.now()}.webm`, { type: 'audio/webm' });
+                    
+                    document.getElementById('media-preview-bar').classList.remove('hidden');
+                    document.getElementById('media-preview-bar').classList.add('flex');
+                    document.getElementById('preview-container').innerHTML = `<audio src="${URL.createObjectURL(audioBlob)}" controls class="h-8 w-full"></audio>`;
+                    document.getElementById('upload-status-text').textContent = "Voice note ready. Tap Send to dispatch.";
+                };
+
+                mediaRecorder.start();
+                isRecording = true;
+                recordingSeconds = 0;
+
+                document.getElementById('message-input').classList.add('hidden');
+                document.getElementById('message-input').classList.remove('flex');
+                document.getElementById('mic-btn').classList.add('hidden');
+                document.getElementById('attach-btn').classList.add('hidden');
+                document.getElementById('recording-ui').classList.remove('hidden');
+                document.getElementById('recording-ui').classList.add('flex');
+
+                recordingTimerInterval = setInterval(() => {
+                    recordingSeconds++;
+                    const mins = Math.floor(recordingSeconds / 60);
+                    const secs = recordingSeconds % 60;
+                    document.getElementById('recording-timer').textContent = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+                }, 1000);
+
+            } catch (err) {
+                showCustomAlert("Microphone Error", "Could not access microphone permissions.");
+            }
+        }
+
+        function stopRecordingOnly() {
+            if (mediaRecorder && isRecording) {
+                mediaRecorder.stop();
+                mediaRecorder.stream.getTracks().forEach(track => track.stop());
+                clearInterval(recordingTimerInterval);
+                isRecording = false;
+
+                document.getElementById('recording-ui').classList.remove('flex');
+                document.getElementById('recording-ui').classList.add('hidden');
+                document.getElementById('message-input').classList.remove('hidden');
+                document.getElementById('message-input').classList.add('flex');
+                document.getElementById('mic-btn').classList.remove('hidden');
+                document.getElementById('attach-btn').classList.remove('hidden');
+            }
+        }
+
+        function togglePauseRecording() {
+            if (!mediaRecorder) return;
+            if (isPaused) {
+                mediaRecorder.resume();
+                isPaused = false;
+                document.getElementById('pause-rec-btn').textContent = '⏸ Pause';
+            } else {
+                mediaRecorder.pause();
+                isPaused = true;
+                document.getElementById('pause-rec-btn').textContent = '▶ Resume';
+            }
+        }
+
+        function cancelRecording() {
+            if (mediaRecorder && isRecording) {
+                mediaRecorder.stop();
+                mediaRecorder.stream.getTracks().forEach(track => track.stop());
+                clearInterval(recordingTimerInterval);
+                isRecording = false;
+            }
+            clearStagedMedia();
+            document.getElementById('recording-ui').classList.remove('flex');
+            document.getElementById('recording-ui').classList.add('hidden');
+            document.getElementById('message-input').classList.remove('hidden');
+            document.getElementById('message-input').classList.add('flex');
+            document.getElementById('mic-btn').classList.remove('hidden');
+            document.getElementById('attach-btn').classList.remove('hidden');
         }
 
         function openMediaGallery(typeFilter) {
@@ -785,7 +1021,13 @@
             matching.forEach(m => {
                 const card = document.createElement('div');
                 card.className = 'bg-slate-900 border border-slate-800 rounded-lg p-2 flex flex-col items-center justify-center';
-                card.innerHTML = `<img src="${m.content}" class="h-24 w-full object-cover rounded cursor-pointer" onclick="window.open('${m.content}')">`;
+                if (typeFilter === 'image') {
+                    card.innerHTML = `<img src="${m.content}" class="h-24 w-full object-cover rounded cursor-pointer" onclick="window.open('${m.content}')">`;
+                } else if (typeFilter === 'video') {
+                    card.innerHTML = `<video src="${m.content}" class="h-24 w-full object-cover rounded cursor-pointer" controls></video>`;
+                } else {
+                    card.innerHTML = `<a href="${m.content}" target="_blank" class="text-xs text-indigo-400 underline">📁 Download File</a>`;
+                }
                 grid.appendChild(card);
             });
         }
@@ -793,26 +1035,6 @@
         function closeMediaGallery() {
             document.getElementById('media-gallery-modal').classList.add('hidden');
         }
-
-        function stageFileSelected(e) {
-            const file = e.target.files[0];
-            if (!file) return;
-            recordedFileStaged = file;
-            document.getElementById('media-preview-bar').classList.remove('hidden');
-            document.getElementById('media-preview-bar').classList.add('flex');
-            document.getElementById('preview-container').innerHTML = `<span class="text-xs">Staged: ${file.name}</span>`;
-        }
-
-        function clearStagedMedia() {
-            recordedFileStaged = null;
-            document.getElementById('media-preview-bar').classList.add('hidden');
-            document.getElementById('media-preview-bar').classList.remove('flex');
-        }
-
-        function startVoiceRecording() {}
-        function stopRecordingOnly() {}
-        function togglePauseRecording() {}
-        function cancelRecording() {}
 
         fetchMessages();
         subscribeToRealtimeChannels();
