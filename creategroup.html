@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat Lite - Create Group</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans">
+
+    <div class="flex-1 flex flex-col w-full max-w-md mx-auto relative overflow-hidden shadow-2xl bg-slate-900 border-x border-slate-800 h-screen">
+        
+        <!-- Header -->
+        <div class="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/90 backdrop-blur-md z-20">
+            <div class="flex items-center gap-3">
+                <button onclick="window.location.href='chatlist.html'" class="text-slate-400 hover:text-white p-1 cursor-pointer">
+                    &larr; Back
+                </button>
+                <h2 class="font-bold text-base text-white">Create New Group</h2>
+            </div>
+        </div>
+
+        <!-- Scrollable Form Container -->
+        <div class="flex-1 overflow-y-auto pb-10 px-6 pt-6">
+            <form onsubmit="handleCreateGroup(event)" class="space-y-5">
+                
+                <!-- Group Avatar Upload -->
+                <div class="flex flex-col items-center justify-center">
+                    <div class="relative group cursor-pointer" onclick="document.getElementById('group-avatar-input').click()">
+                        <div id="group-avatar-preview" class="w-24 h-24 rounded-full border-4 border-slate-800 bg-slate-950 overflow-hidden shadow-xl flex items-center justify-center text-2xl font-bold text-orange-400">
+                            GRP
+                        </div>
+                        <div class="absolute inset-0 rounded-full bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-[10px] text-center font-semibold p-1">
+                            Group Photo
+                        </div>
+                    </div>
+                    <input type="file" id="group-avatar-input" accept="image/*" class="hidden" onchange="handleFileSelect(event)">
+                    <span class="text-[11px] text-slate-400 mt-2">Tap to upload group icon</span>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-slate-400 mb-1">Group Name</label>
+                    <input type="text" id="group-name" required placeholder="e.g. Project Innovate" class="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl focus:outline-none focus:border-orange-500 text-sm text-white">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-slate-400 mb-1">Group Description</label>
+                    <textarea id="group-desc" rows="2" placeholder="What is this group about?" class="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl focus:outline-none focus:border-orange-500 text-sm text-white resize-none"></textarea>
+                </div>
+
+                <!-- Add Members from Connections Section -->
+                <div>
+                    <label class="block text-xs font-medium text-slate-400 mb-1">Select Connections to Invite</label>
+                    <p class="text-[11px] text-slate-500 mb-2">Selected contacts will receive an invite to accept or decline joining.</p>
+                    
+                    <!-- Connections Checklist Container -->
+                    <div id="connections-checklist" class="flex flex-col gap-2 max-h-48 overflow-y-auto p-2.5 bg-slate-950/50 border border-slate-800/80 rounded-xl">
+                        <span class="text-xs text-slate-500 p-2 text-center">Loading your connections...</span>
+                    </div>
+                </div>
+
+                <button type="submit" id="create-btn" class="w-full py-3.5 bg-orange-600 hover:bg-orange-500 font-semibold rounded-xl shadow-lg shadow-orange-600/30 transition-all mt-4 cursor-pointer text-white">
+                    Create Group
+                </button>
+            </form>
+        </div>
+
+    </div>
+
+    <!-- CUSTOM FANCY MODAL POPUP -->
+    <div id="custom-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md hidden items-center justify-center p-4 z-50 transition-all">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-xs p-6 text-center shadow-2xl transform scale-95 transition-transform" id="modal-content-box">
+            <div id="modal-icon-container" class="w-12 h-12 rounded-full bg-orange-600/20 border border-orange-500/30 flex items-center justify-center mx-auto mb-3 text-orange-400 text-xl font-bold">
+                i
+            </div>
+            <h3 id="modal-title" class="font-bold text-base text-white mb-1">Notice</h3>
+            <p id="modal-message" class="text-xs text-slate-400 mb-5 leading-relaxed">Message text goes here.</p>
+            <button id="modal-ok-btn" onclick="closeCustomModal()" class="w-full py-2.5 bg-orange-600 hover:bg-orange-500 text-white font-semibold rounded-xl text-xs shadow-lg shadow-orange-600/20 transition-all cursor-pointer">
+                Okay
+            </button>
+        </div>
+    </div>
+
+    <script src="supabase.js"></script>
+    <script>
+        const dbClient = typeof supabaseClient !== 'undefined' ? supabaseClient : (typeof supabase !== 'undefined' ? supabase : null);
+        let currentUser = JSON.parse(localStorage.getItem('chatlite_user'));
+        let groupAvatarBase64 = null;
+        let connectionsList = [];
+        let modalCallback = null;
+
+        if (!currentUser) {
+            window.location.href = 'index.html';
+        } else {
+            loadUserConnections();
+        }
+
+        function showModal(title, message, isSuccess = true, callback = null) {
+            const modal = document.getElementById('custom-modal');
+            const box = document.getElementById('modal-content-box');
+            const titleEl = document.getElementById('modal-title');
+            const msgEl = document.getElementById('modal-message');
+            const iconEl = document.getElementById('modal-icon-container');
+
+            titleEl.textContent = title;
+            msgEl.textContent = message;
+            modalCallback = callback;
+
+            if (isSuccess) {
+                iconEl.className = 'w-12 h-12 rounded-full bg-emerald-600/20 border border-emerald-500/30 flex items-center justify-center mx-auto mb-3 text-emerald-400 text-xl';
+                iconEl.innerHTML = '✓';
+            } else {
+                iconEl.className = 'w-12 h-12 rounded-full bg-red-600/20 border border-red-500/30 flex items-center justify-center mx-auto mb-3 text-red-400 text-xl';
+                iconEl.innerHTML = '!';
+            }
+
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            setTimeout(() => box.classList.remove('scale-95'), 10);
+        }
+
+        function closeCustomModal() {
+            const modal = document.getElementById('custom-modal');
+            modal.classList.remove('flex');
+            modal.classList.add('hidden');
+            if (modalCallback) {
+                modalCallback();
+                modalCallback = null;
+            }
+        }
+
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    const canvas = document.createElement('canvas');
+                    const MAX_WIDTH = 300;
+                    const MAX_HEIGHT = 300;
+                    let width = img.width;
+                    let height = img.height;
+
+                    if (width > height) {
+                        if (width > MAX_WIDTH) { height *= MAX_WIDTH / width; width = MAX_WIDTH; }
+                    } else {
+                        if (height > MAX_HEIGHT) { width *= MAX_HEIGHT / height; height = MAX_HEIGHT; }
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+
+                    groupAvatarBase64 = canvas.toDataURL('image/jpeg', 0.75);
+                    document.getElementById('group-avatar-preview').innerHTML = `<img src="${groupAvatarBase64}" class="w-full h-full object-cover">`;
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        async function loadUserConnections() {
+            if (!dbClient) return;
+
+            const { data: connections, error } = await dbClient
+                .from('connections')
+                .select('*')
+                .eq('status', 'accepted')
+                .or(`sender_username.eq.${currentUser.username},receiver_username.eq.${currentUser.username}`);
+
+            if (error) {
+                document.getElementById('connections-checklist').innerHTML = `<span class="text-xs text-red-400 p-2 text-center">Failed to load connections.</span>`;
+                return;
+            }
+
+            if (!connections || connections.length === 0) {
+                document.getElementById('connections-checklist').innerHTML = `<span class="text-xs text-slate-500 p-2 text-center">No connections found. Add contacts first via chat codes.</span>`;
+                return;
+            }
+
+            let friendUsernames = [];
+            connections.forEach(c => {
+                if (c.sender_username === currentUser.username) friendUsernames.push(c.receiver_username);
+                if (c.receiver_username === currentUser.username) friendUsernames.push(c.sender_username);
+            });
+
+            const { data: profiles, error: profError } = await dbClient
+                .from('profiles')
+                .select('*')
+                .in('username', friendUsernames);
+
+            if (profError || !profiles) {
+                document.getElementById('connections-checklist').innerHTML = `<span class="text-xs text-slate-500 p-2 text-center">No connection profiles available.</span>`;
+                return;
+            }
+
+            connectionsList = profiles;
+            renderConnectionsChecklist();
+        }
+
+        function renderConnectionsChecklist() {
+            const container = document.getElementById('connections-checklist');
+            container.innerHTML = '';
+
+            connectionsList.forEach(friend => {
+                const label = document.createElement('label');
+                label.className = 'flex items-center justify-between p-2 bg-slate-900 hover:bg-slate-800/80 rounded-lg cursor-pointer transition-all border border-slate-800';
+                
+                let avatarHTML = friend.avatar_url 
+                    ? `<img src="${friend.avatar_url}" class="w-8 h-8 rounded-full object-cover">`
+                    : `<div class="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center font-bold text-orange-400 text-xs">${friend.name.charAt(0).toUpperCase()}</div>`;
+
+                label.innerHTML = `
+                    <div class="flex items-center gap-2.5 min-w-0">
+                        ${avatarHTML}
+                        <div class="min-w-0">
+                            <p class="text-xs font-semibold text-white truncate">${friend.name}</p>
+                            <p class="text-[10px] text-slate-400 truncate">@${friend.username}</p>
+                        </div>
+                    </div>
+                    <input type="checkbox" name="group_invite" value="${friend.username}" class="w-4 h-4 accent-orange-600 rounded bg-slate-950 border-slate-700 cursor-pointer">
+                `;
+                container.appendChild(label);
+            });
+        }
+
+        async function handleCreateGroup(e) {
+            e.preventDefault();
+            if (!dbClient) {
+                alert('Database client not initialized.');
+                return;
+            }
+
+            const groupName = document.getElementById('group-name').value.trim();
+            const groupDesc = document.getElementById('group-desc').value.trim();
+
+            if (!groupName) return;
+
+            const selectedCheckboxes = document.querySelectorAll('input[name="group_invite"]:checked');
+            let selectedUsernames = [];
+            selectedCheckboxes.forEach(cb => selectedUsernames.push(cb.value));
+
+            const createBtn = document.getElementById('create-btn');
+            createBtn.textContent = 'Creating group...';
+            createBtn.disabled = true;
+
+            const groupChatCode = 'GRP-' + Math.random().toString(36).substring(2, 8).toUpperCase();
+
+            // 1. Create Group record
+            const { data: groupData, error: groupError } = await dbClient
+                .from('groups')
+                .insert([{
+                    name: groupName,
+                    description: groupDesc,
+                    avatar_url: groupAvatarBase64,
+                    chat_code: groupChatCode,
+                    created_by: currentUser.username
+                }])
+                .select()
+                .single();
+
+            if (groupError) {
+                showModal('Error', 'Error creating group: ' + groupError.message, false, () => {
+                    createBtn.textContent = 'Create Group';
+                    createBtn.disabled = false;
+                });
+                return;
+            }
+
+            // 2. Add creator as Admin, and selected connections as members
+            const membersPayload = [{
+                group_id: groupData.id,
+                username: currentUser.username,
+                role: 'admin',
+                status: 'accepted'
+            }];
+
+            selectedUsernames.forEach(username => {
+                membersPayload.push({
+                    group_id: groupData.id,
+                    username: username,
+                    role: 'member',
+                    status: 'pending'
+                });
+            });
+
+            const { error: memError } = await dbClient
+                .from('group_members')
+                .insert(membersPayload);
+
+            if (memError) {
+                showModal('Warning', 'Group created, but encountered an error adding members: ' + memError.message, false, () => {
+                    window.location.href = 'chatlist.html';
+                });
+            } else {
+                showModal('Success!', 'Group created successfully! Invitations sent to selected connections.', true, () => {
+                    window.location.href = 'chatlist.html';
+                });
+            }
+        }
+    </script>
+</body>
+</html>
