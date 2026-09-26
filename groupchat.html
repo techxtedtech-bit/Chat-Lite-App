@@ -569,7 +569,7 @@
             const fileName = `groups/${groupId}/${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${fileExt}`;
 
             const { data, error } = await dbClient.storage
-                .from('chat-files')
+                .from('chat-media')
                 .upload(fileName, fileBlob, { upsert: true });
 
             if (error) {
@@ -582,7 +582,7 @@
             statusText.textContent = 'Fetching public URL...';
 
             const { data: publicUrlData } = dbClient.storage
-                .from('chat-files')
+                .from('chat-media')
                 .getPublicUrl(fileName);
 
             progressBar.style.width = '100%';
