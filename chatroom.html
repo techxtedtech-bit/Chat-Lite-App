@@ -14,10 +14,12 @@
         <div class="p-3 border-b border-slate-800 flex items-center justify-between bg-slate-900 z-20 flex-shrink-0">
             <div class="flex items-center gap-2.5 overflow-hidden">
                 <button onclick="window.location.href='chatlist.html'" class="text-slate-400 hover:text-white text-sm cursor-pointer px-1">&larr;</button>
-                <div class="w-8 h-8 rounded-full bg-indigo-600/30 border border-indigo-500/30 flex items-center justify-center font-bold text-indigo-400 text-xs flex-shrink-0 overflow-hidden" id="active-chat-avatar">U</div>
-                <div class="overflow-hidden">
-                    <h3 class="font-bold text-xs truncate" id="active-chat-name">Username</h3>
-                    <span class="text-[9px] text-slate-400 truncate block" id="active-chat-gender">Gender</span>
+                <div onclick="openUserProfileModal()" class="flex items-center gap-2.5 cursor-pointer overflow-hidden group">
+                    <div class="w-8 h-8 rounded-full bg-indigo-600/30 border border-indigo-500/30 flex items-center justify-center font-bold text-indigo-400 text-xs flex-shrink-0 overflow-hidden" id="active-chat-avatar">U</div>
+                    <div class="overflow-hidden">
+                        <h3 class="font-bold text-xs truncate group-hover:text-indigo-400 transition-colors" id="active-chat-name">Username</h3>
+                        <span class="text-[9px] text-slate-400 truncate block" id="active-chat-gender">Gender</span>
+                    </div>
                 </div>
             </div>
             <!-- Header Quick Action Buttons -->
@@ -64,6 +66,42 @@
                 </div>
                 <div id="message-options-actions" class="flex flex-col gap-1.5">
                     <!-- Populated dynamically based on permissions & 3-hour limit for everyone -->
+                </div>
+            </div>
+        </div>
+
+        <!-- User Profile Modal Drawer -->
+        <div id="user-profile-modal" class="hidden absolute inset-0 bg-slate-950/80 z-50 flex flex-col justify-end backdrop-blur-sm">
+            <div class="bg-slate-900 border-t border-slate-800 rounded-t-3xl p-5 shadow-2xl flex flex-col gap-4 max-h-[85vh] overflow-y-auto animate-in slide-in-from-bottom duration-200">
+                <div class="flex justify-between items-center pb-2 border-b border-slate-800">
+                    <h3 class="font-bold text-sm text-white">User Profile</h3>
+                    <button onclick="closeUserProfileModal()" class="text-slate-400 hover:text-white text-lg cursor-pointer px-2">&times;</button>
+                </div>
+                <div class="flex flex-col items-center text-center gap-3 py-2">
+                    <div id="profile-modal-avatar-container" class="w-20 h-20 rounded-full bg-indigo-600/30 border-2 border-indigo-500/50 flex items-center justify-center font-bold text-indigo-300 text-2xl overflow-hidden shadow-lg">
+                        U
+                    </div>
+                    <div>
+                        <h2 id="profile-modal-name" class="font-bold text-base text-white">Loading...</h2>
+                        <span id="profile-modal-username" class="text-xs text-indigo-400 block">@username</span>
+                    </div>
+                </div>
+                <div class="bg-slate-950 border border-slate-800 rounded-2xl p-3.5 flex flex-col gap-3">
+                    <div class="flex flex-col gap-1">
+                        <span class="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">Unique Chat Code</span>
+                        <div class="flex items-center justify-between bg-slate-900 border border-slate-800 px-3 py-2 rounded-xl">
+                            <span id="profile-modal-chatcode" class="text-xs font-mono text-slate-200 select-all">--</span>
+                            <button onclick="copyChatCode()" class="text-[11px] text-indigo-400 hover:text-indigo-300 font-medium cursor-pointer">Copy</button>
+                        </div>
+                    </div>
+                    <div class="flex flex-col gap-1">
+                        <span class="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">Bio</span>
+                        <p id="profile-modal-bio" class="text-xs text-slate-300 bg-slate-900 border border-slate-800 p-3 rounded-xl min-h-[50px] leading-relaxed">No bio available.</p>
+                    </div>
+                </div>
+                <div class="flex flex-col gap-2 pt-2">
+                    <button onclick="blockActiveUser()" class="w-full py-2.5 bg-red-600/20 hover:bg-red-600/30 border border-red-500/40 text-red-400 font-bold text-xs rounded-xl transition-all cursor-pointer">Block User</button>
+                    <button onclick="closeUserProfileModal()" class="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs rounded-xl transition-all cursor-pointer">Close</button>
                 </div>
             </div>
         </div>
@@ -182,6 +220,7 @@
         let recordingTimerInterval = null;
         let recordingSeconds = 0;
         let replyingToMessage = null;
+        let fetchedTargetProfile = null;
 
         // Multi-select state variables
         let isMultiSelectMode = false;
@@ -235,6 +274,101 @@
             } else {
                 filterMessages('');
             }
+        }
+
+        // --- USER PROFILE & BLOCK MODAL FUNCTIONS ---
+        async function openUserProfileModal() {
+            const modal = document.getElementById('user-profile-modal');
+            const nameEl = document.getElementById('profile-modal-name');
+            const usernameEl = document.getElementById('profile-modal-username');
+            const chatCodeEl = document.getElementById('profile-modal-chatcode');
+            const bioEl = document.getElementById('profile-modal-bio');
+            const avatarContainer = document.getElementById('profile-modal-avatar-container');
+
+            modal.classList.remove('hidden');
+
+            // Set fallback details immediately from URL parameters while fetching
+            nameEl.textContent = targetName;
+            usernameEl.textContent = `@${targetUsername}`;
+            avatarContainer.innerHTML = targetName ? targetName.charAt(0).toUpperCase() : 'U';
+
+            if (navigator.onLine) {
+                const { data, error } = await supabaseClient
+                    .from('profiles')
+                    .select('*')
+                    .eq('username', targetUsername)
+                    .single();
+
+                if (!error && data) {
+                    fetchedTargetProfile = data;
+                    nameEl.textContent = data.name || targetName;
+                    usernameEl.textContent = `@${data.username}`;
+                    chatCodeEl.textContent = data.chat_code || data.unique_code || 'N/A';
+                    bioEl.textContent = data.bio || 'No bio available.';
+
+                    if (data.avatar_url || data.image_url) {
+                        const imgUrl = data.avatar_url || data.image_url;
+                        avatarContainer.innerHTML = `<img src="${imgUrl}" class="w-full h-full object-cover">`;
+                    }
+                } else {
+                    chatCodeEl.textContent = 'Unavailable';
+                    bioEl.textContent = 'Could not retrieve profile info.';
+                }
+            } else {
+                chatCodeEl.textContent = 'Offline Mode';
+                bioEl.textContent = 'Profile details unavailable while offline.';
+            }
+        }
+
+        function closeUserProfileModal() {
+            document.getElementById('user-profile-modal').classList.add('hidden');
+        }
+
+        function copyChatCode() {
+            const codeText = document.getElementById('profile-modal-chatcode').textContent;
+            if (codeText && codeText !== '--' && codeText !== 'N/A' && codeText !== 'Unavailable') {
+                navigator.clipboard.writeText(codeText);
+                alert('Unique chat code copied to clipboard!');
+            } else {
+                alert('No chat code available to copy.');
+            }
+        }
+
+        async function blockActiveUser() {
+            if (!confirm(`Are you sure you want to block @${targetUsername}? You will no longer receive messages from them.`)) {
+                return;
+            }
+
+            const blockPayload = {
+                blocker_username: currentUser.username,
+                blocked_username: targetUsername,
+                created_at: new Date().toISOString()
+            };
+
+            if (navigator.onLine) {
+                const { error } = await supabaseClient
+                    .from('blocked_users')
+                    .insert([blockPayload]);
+
+                if (error) {
+                    console.error('Error blocking user on Supabase:', error);
+                    // Fallback to local storage block list if table schema differs
+                }
+            }
+
+            // Save locally as well to ensure immediate enforcement
+            let blockedList = [];
+            try {
+                blockedList = JSON.parse(localStorage.getItem(`chatlite_blocked_${currentUser.username}`) || '[]');
+            } catch(e) {}
+
+            if (!blockedList.includes(targetUsername)) {
+                blockedList.push(targetUsername);
+                localStorage.setItem(`chatlite_blocked_${currentUser.username}`, JSON.stringify(blockedList));
+            }
+
+            alert(`Successfully blocked @${targetUsername}.`);
+            window.location.href = 'chatlist.html';
         }
 
         async function fetchMessages() {
@@ -419,7 +553,6 @@
             const contentBody = document.createElement('div');
             const type = msg.message_type || 'text';
             
-            // STRICT TYPE ROUTING FIXED HERE
             if (type === 'image') {
                 contentBody.innerHTML = `<img src="${msg.content}" class="rounded-xl max-h-60 w-full object-cover cursor-pointer" onclick="if(!isMultiSelectMode) window.open('${msg.content}')">`;
             } else if (type === 'video') {
@@ -826,7 +959,7 @@
             const file = event.target.files[0];
             if (!file) return;
 
-            recordedFileStaged = file; // Hold raw file reference for bucket upload
+            recordedFileStaged = file; 
 
             const reader = new FileReader();
             const progressBar = document.getElementById('upload-progress-bar');
@@ -841,7 +974,6 @@
                 progressBar.style.width = '100%';
                 statusText.textContent = 'Ready! Hit the Send button to upload to storage.';
 
-                // STRICT TYPE CLASSIFICATION FIXED HERE
                 let type = 'file';
                 if (file.type.startsWith('image/')) {
                     type = 'image';
@@ -932,7 +1064,6 @@
                 isRecording = false;
                 clearInterval(recordingTimerInterval);
                 
-                // Set explicit staged payload type for voice recordings
                 stagedPayload = {
                     type: 'audio'
                 };
@@ -980,7 +1111,6 @@
                 };
             }
 
-            // Handle file or voice note upload to Supabase bucket
             if (recordedFileStaged || stagedPayload) {
                 const fileToUpload = recordedFileStaged;
                 let fileType = stagedPayload ? stagedPayload.type : 'audio';
