@@ -932,6 +932,11 @@
                 isRecording = false;
                 clearInterval(recordingTimerInterval);
                 
+                // Set explicit staged payload type for voice recordings
+                stagedPayload = {
+                    type: 'audio'
+                };
+
                 document.getElementById('media-preview-bar').classList.remove('hidden');
                 document.getElementById('media-preview-bar').classList.add('flex');
                 document.getElementById('preview-container').innerHTML = `<span class="text-indigo-400 font-bold text-xs">Voice Note Recorded (${recordingSeconds}s). Ready to Send.</span>`;
@@ -978,10 +983,9 @@
             // Handle file or voice note upload to Supabase bucket
             if (recordedFileStaged || stagedPayload) {
                 const fileToUpload = recordedFileStaged;
-                let fileType = recordedFileStaged ? 'audio' : stagedPayload.type;
+                let fileType = stagedPayload ? stagedPayload.type : 'audio';
 
-                if (!fileToUpload && stagedPayload) {
-                    // Fallback if file object wasn't captured directly
+                if (!fileToUpload) {
                     alert('Please re-attach the file.');
                     return;
                 }
