@@ -112,6 +112,22 @@
             </div>
         </div>
 
+        <!-- Custom Styled Alert/Notification Modal -->
+        <div id="custom-alert-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md hidden items-center justify-center p-4 z-50">
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-xs p-5 space-y-4 shadow-2xl text-center">
+                <div class="w-10 h-10 bg-orange-600/20 text-orange-500 rounded-full flex items-center justify-center mx-auto text-lg font-bold">
+                    !
+                </div>
+                <div class="space-y-1">
+                    <h4 class="font-bold text-sm text-white" id="custom-alert-title">Notice</h4>
+                    <p class="text-xs text-slate-300 leading-relaxed" id="custom-alert-message">Something went wrong.</p>
+                </div>
+                <button type="button" onclick="closeCustomAlert()" class="w-full py-2.5 bg-orange-600 hover:bg-orange-500 text-white font-semibold text-xs rounded-xl transition-all cursor-pointer shadow-lg shadow-orange-600/20">
+                    Okay
+                </button>
+            </div>
+        </div>
+
     </div>
 
     <script src="supabase.js"></script>
@@ -128,6 +144,20 @@
             modal.classList.add('hidden');
         }
 
+        function showCustomAlert(message, title = "Notice") {
+            document.getElementById('custom-alert-title').textContent = title;
+            document.getElementById('custom-alert-message').textContent = message;
+            const alertModal = document.getElementById('custom-alert-modal');
+            alertModal.classList.remove('hidden');
+            alertModal.classList.add('flex');
+        }
+
+        function closeCustomAlert() {
+            const alertModal = document.getElementById('custom-alert-modal');
+            alertModal.classList.remove('flex');
+            alertModal.classList.add('hidden');
+        }
+
         async function handleLogin(e) {
             e.preventDefault();
             const username = document.getElementById('login-username').value.trim().toLowerCase();
@@ -142,14 +172,14 @@
                     .maybeSingle();
 
                 if (error || !data) {
-                    alert('Invalid username or password.');
+                    showCustomAlert('Invalid username or password. Please try again.', 'Login Failed');
                     return;
                 }
 
                 localStorage.setItem('chatlite_user', JSON.stringify(data));
                 window.location.href = 'chatlist.html';
             } catch (err) {
-                alert('An error occurred during login. Please check your connection.');
+                showCustomAlert('An error occurred during login. Please check your connection.', 'Connection Error');
             }
         }
     </script>

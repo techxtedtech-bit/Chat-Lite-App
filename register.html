@@ -56,10 +56,45 @@
             </div>
         </div>
 
+        <!-- Custom Styled Alert/Notification Modal -->
+        <div id="custom-alert-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md hidden items-center justify-center p-4 z-50">
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-xs p-5 space-y-4 shadow-2xl text-center">
+                <div class="w-10 h-10 bg-orange-600/20 text-orange-500 rounded-full flex items-center justify-center mx-auto text-lg font-bold" id="custom-alert-icon">
+                    !
+                </div>
+                <div class="space-y-1">
+                    <h4 class="font-bold text-sm text-white" id="custom-alert-title">Notice</h4>
+                    <p class="text-xs text-slate-300 leading-relaxed whitespace-pre-line" id="custom-alert-message">Something went wrong.</p>
+                </div>
+                <button type="button" onclick="closeCustomAlert()" class="w-full py-2.5 bg-orange-600 hover:bg-orange-500 text-white font-semibold text-xs rounded-xl transition-all cursor-pointer shadow-lg shadow-orange-600/20">
+                    Okay
+                </button>
+            </div>
+        </div>
+
     </div>
 
     <script src="supabase.js"></script>
     <script>
+        function showCustomAlert(message, title = "Notice") {
+            document.getElementById('custom-alert-title').textContent = title;
+            document.getElementById('custom-alert-message').textContent = message;
+            const alertModal = document.getElementById('custom-alert-modal');
+            alertModal.classList.remove('hidden');
+            alertModal.classList.add('flex');
+        }
+
+        function closeCustomAlert() {
+            const alertModal = document.getElementById('custom-alert-modal');
+            alertModal.classList.remove('flex');
+            alertModal.classList.add('hidden');
+            
+            // If it was a successful registration, redirect after closing modal
+            if (window.isRegistrationSuccess) {
+                window.location.href = 'index.html';
+            }
+        }
+
         function generateChatCode() {
             const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
             let code = 'CL-';
@@ -79,7 +114,7 @@
             const password = document.getElementById('reg-password').value;
 
             if (!name || !username || !password) {
-                alert('Please fill in all required fields.');
+                showCustomAlert('Please fill in all required fields.', 'Missing Information');
                 return;
             }
 
@@ -100,7 +135,7 @@
                 }
 
                 if (existing) {
-                    alert('Username is already taken. Please choose another.');
+                    showCustomAlert('Username is already taken. Please choose another.', 'Username Taken');
                     submitBtn.disabled = false;
                     submitBtn.textContent = 'Register Profile';
                     return;
@@ -135,12 +170,12 @@
                     throw new Error(insertError.message);
                 }
 
-                alert(`Profile created successfully!\n\nYour Unique Chat Code is: ${chatCode}\nSave this or use it to sign in.`);
-                window.location.href = 'index.html';
+                window.isRegistrationSuccess = true;
+                showCustomAlert(`Profile created successfully!\n\nYour Unique Chat Code is: ${chatCode}\nSave this or use it to sign in.`, 'Success');
 
             } catch (err) {
                 console.error('Registration exception:', err);
-                alert('Error creating profile: ' + (err.message || 'Network connection or database issue occurred.'));
+                showCustomAlert('Error creating profile: ' + (err.message || 'Network connection or database issue occurred.'), 'Registration Error');
                 submitBtn.disabled = false;
                 submitBtn.textContent = 'Register Profile';
             }

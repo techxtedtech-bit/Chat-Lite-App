@@ -57,6 +57,17 @@
             <button type="button" onclick="triggerUndoAction()" class="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-lg cursor-pointer">Undo (<span id="undo-countdown">10</span>s)</button>
         </div>
 
+        <!-- Custom Styled App Modal / Popup (Replaces Browser Native Alerts & Confirms) -->
+        <div id="custom-app-modal" class="hidden absolute inset-0 bg-slate-950/80 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-xs p-4 shadow-2xl flex flex-col gap-3">
+                <h3 id="custom-modal-title" class="font-bold text-sm text-white">Notice</h3>
+                <p id="custom-modal-message" class="text-xs text-slate-300 leading-relaxed">Message content goes here...</p>
+                <div id="custom-modal-actions" class="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+                    <!-- Dynamic buttons injected via JS -->
+                </div>
+            </div>
+        </div>
+
         <!-- Message Options Popup Modal (Long Press Menu) -->
         <div id="message-options-modal" class="hidden absolute inset-0 bg-slate-950/70 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
             <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-xs p-3 shadow-2xl flex flex-col gap-2">
@@ -234,6 +245,54 @@
             renderMessages(messagesCache);
         }
 
+        // --- CUSTOM MODAL HELPER FUNCTIONS (Replaces native alert/confirm) ---
+        function showCustomAlert(title, message, onOk = null) {
+            const modal = document.getElementById('custom-app-modal');
+            document.getElementById('custom-modal-title').textContent = title;
+            document.getElementById('custom-modal-message').textContent = message;
+            
+            const actions = document.getElementById('custom-modal-actions');
+            actions.innerHTML = `
+                <button type="button" id="custom-modal-ok-btn" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl cursor-pointer transition-all">OK</button>
+            `;
+            
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+
+            document.getElementById('custom-modal-ok-btn').onclick = () => {
+                modal.classList.remove('flex');
+                modal.classList.add('hidden');
+                if (onOk) onOk();
+            };
+        }
+
+        function showCustomConfirm(title, message, onConfirm, onCancel = null) {
+            const modal = document.getElementById('custom-app-modal');
+            document.getElementById('custom-modal-title').textContent = title;
+            document.getElementById('custom-modal-message').textContent = message;
+            
+            const actions = document.getElementById('custom-modal-actions');
+            actions.innerHTML = `
+                <button type="button" id="custom-modal-cancel-btn" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs rounded-xl cursor-pointer transition-all">Cancel</button>
+                <button type="button" id="custom-modal-confirm-btn" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl cursor-pointer transition-all">Confirm</button>
+            `;
+            
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+
+            document.getElementById('custom-modal-cancel-btn').onclick = () => {
+                modal.classList.remove('flex');
+                modal.classList.add('hidden');
+                if (onCancel) onCancel();
+            };
+
+            document.getElementById('custom-modal-confirm-btn').onclick = () => {
+                modal.classList.remove('flex');
+                modal.classList.add('hidden');
+                if (onConfirm) onConfirm();
+            };
+        }
+
         function loadLocalCache() {
             try {
                 const data = localStorage.getItem(STORAGE_KEY);
@@ -287,7 +346,6 @@
 
             modal.classList.remove('hidden');
 
-            // Set fallback details immediately from URL parameters while fetching
             nameEl.textContent = targetName;
             usernameEl.textContent = `@${targetUsername}`;
             avatarContainer.innerHTML = targetName ? targetName.charAt(0).toUpperCase() : 'U';
@@ -328,47 +386,48 @@
             const codeText = document.getElementById('profile-modal-chatcode').textContent;
             if (codeText && codeText !== '--' && codeText !== 'N/A' && codeText !== 'Unavailable') {
                 navigator.clipboard.writeText(codeText);
-                alert('Unique chat code copied to clipboard!');
+                showCustomAlert('Copied', 'Unique chat code copied to clipboard!');
             } else {
-                alert('No chat code available to copy.');
+                showCustomAlert('Notice', 'No chat code available to copy.');
             }
         }
 
-        async function blockActiveUser() {
-            if (!confirm(`Are you sure you want to block @${targetUsername}? You will no longer receive messages from them.`)) {
-                return;
-            }
+        function blockActiveUser() {
+            showCustomConfirm(
+                'Block User',
+                `Are you sure you want to block @${targetUsername}? You will no longer receive messages from them.`,
+                async () => {
+                    const blockPayload = {
+                        blocker_username: currentUser.username,
+                        blocked_username: targetUsername,
+                        created_at: new Date().toISOString()
+                    };
 
-            const blockPayload = {
-                blocker_username: currentUser.username,
-                blocked_username: targetUsername,
-                created_at: new Date().toISOString()
-            };
+                    if (navigator.onLine) {
+                        const { error } = await supabaseClient
+                            .from('blocked_users')
+                            .insert([blockPayload]);
 
-            if (navigator.onLine) {
-                const { error } = await supabaseClient
-                    .from('blocked_users')
-                    .insert([blockPayload]);
+                        if (error) {
+                            console.error('Error blocking user on Supabase:', error);
+                        }
+                    }
 
-                if (error) {
-                    console.error('Error blocking user on Supabase:', error);
-                    // Fallback to local storage block list if table schema differs
+                    let blockedList = [];
+                    try {
+                        blockedList = JSON.parse(localStorage.getItem(`chatlite_blocked_${currentUser.username}`) || '[]');
+                    } catch(e) {}
+
+                    if (!blockedList.includes(targetUsername)) {
+                        blockedList.push(targetUsername);
+                        localStorage.setItem(`chatlite_blocked_${currentUser.username}`, JSON.stringify(blockedList));
+                    }
+
+                    showCustomAlert('Blocked', `Successfully blocked @${targetUsername}.`, () => {
+                        window.location.href = 'chatlist.html';
+                    });
                 }
-            }
-
-            // Save locally as well to ensure immediate enforcement
-            let blockedList = [];
-            try {
-                blockedList = JSON.parse(localStorage.getItem(`chatlite_blocked_${currentUser.username}`) || '[]');
-            } catch(e) {}
-
-            if (!blockedList.includes(targetUsername)) {
-                blockedList.push(targetUsername);
-                localStorage.setItem(`chatlite_blocked_${currentUser.username}`, JSON.stringify(blockedList));
-            }
-
-            alert(`Successfully blocked @${targetUsername}.`);
-            window.location.href = 'chatlist.html';
+            );
         }
 
         async function fetchMessages() {
@@ -470,7 +529,6 @@
                 wrapper.classList.add('bg-indigo-950/30', 'p-2', 'rounded-xl');
             }
 
-            // --- Press & Tap Handlers for Options Menu vs Multi-Select ---
             let pressTimer = null;
             const startPress = () => {
                 if (msg.is_offline_pending) return; 
@@ -509,7 +567,6 @@
                 }
             };
 
-            // --- Swipe Right to Reply Handlers ---
             let touchStartX = 0;
             let touchCurrentX = 0;
 
@@ -631,7 +688,6 @@
             }
         }
 
-        // --- MULTI-SELECT FUNCTIONS ---
         function enterMultiSelectMode(msg) {
             isMultiSelectMode = true;
             selectedMessageIds.clear();
@@ -698,7 +754,6 @@
             });
         }
 
-        // --- REPLY MANAGEMENT FUNCTIONS ---
         function setReplyTarget(msg) {
             if (isMultiSelectMode) return;
             replyingToMessage = msg;
@@ -728,7 +783,6 @@
             replyBar.classList.add('hidden');
         }
 
-        // --- OFFLINE QUEUE MANAGEMENT & SYNC ---
         async function flushOfflineQueue() {
             const queue = loadOfflineQueue();
             if (queue.length === 0) return;
@@ -770,11 +824,9 @@
         }
 
         window.addEventListener('online', async () => {
-            console.log('Back online! Flushing offline queue...');
             await fetchMessages();
         });
 
-        // --- MESSAGE OPTIONS (LONG PRESS) & ACTIONS ---
         function openMessageOptions(msg) {
             if (isMultiSelectMode) return;
             const modal = document.getElementById('message-options-modal');
@@ -787,7 +839,6 @@
             const diffHours = (now - msgTime) / (1000 * 60 * 60);
             const within3Hours = diffHours <= 3;
 
-            // 1. Reply Option
             const replyBtn = document.createElement('button');
             replyBtn.className = 'w-full text-left px-3 py-2 text-xs font-medium text-slate-200 hover:bg-slate-800 rounded-xl transition-all cursor-pointer';
             replyBtn.textContent = '↩️ Reply';
@@ -797,7 +848,6 @@
             };
             actionsContainer.appendChild(replyBtn);
 
-            // 2. Copy Option (Text only)
             if (msg.message_type === 'text' && msg.content) {
                 const copyBtn = document.createElement('button');
                 copyBtn.className = 'w-full text-left px-3 py-2 text-xs font-medium text-slate-200 hover:bg-slate-800 rounded-xl transition-all cursor-pointer';
@@ -809,7 +859,6 @@
                 actionsContainer.appendChild(copyBtn);
             }
 
-            // 3. Forward Option
             const forwardBtn = document.createElement('button');
             forwardBtn.className = 'w-full text-left px-3 py-2 text-xs font-medium text-slate-200 hover:bg-slate-800 rounded-xl transition-all cursor-pointer';
             forwardBtn.textContent = '↗️ Forward';
@@ -820,7 +869,6 @@
             };
             actionsContainer.appendChild(forwardBtn);
 
-            // 4. Delete for me Option
             const deleteForMeBtn = document.createElement('button');
             deleteForMeBtn.className = 'w-full text-left px-3 py-2 text-xs font-medium text-slate-200 hover:bg-slate-800 rounded-xl transition-all cursor-pointer';
             deleteForMeBtn.textContent = '🗑️ Delete for me';
@@ -830,7 +878,6 @@
             };
             actionsContainer.appendChild(deleteForMeBtn);
 
-            // 5. Delete for everyone Option
             if (isSender && within3Hours) {
                 const deleteForEveryoneBtn = document.createElement('button');
                 deleteForEveryoneBtn.className = 'w-full text-left px-3 py-2 text-xs font-medium text-red-400 hover:bg-slate-800 rounded-xl transition-all cursor-pointer';
@@ -1040,7 +1087,7 @@
                     }
                 }, 1000);
             } catch (err) {
-                alert('Microphone access denied or unavailable.');
+                showCustomAlert('Error', 'Microphone access denied or unavailable.');
             }
         }
 
@@ -1116,7 +1163,7 @@
                 let fileType = stagedPayload ? stagedPayload.type : 'audio';
 
                 if (!fileToUpload) {
-                    alert('Please re-attach the file.');
+                    showCustomAlert('Error', 'Please re-attach the file.');
                     return;
                 }
 
@@ -1131,7 +1178,7 @@
                     .upload(fileName, fileToUpload);
 
                 if (uploadError) {
-                    alert('Failed to upload file to storage: ' + uploadError.message);
+                    showCustomAlert('Upload Failed', 'Failed to upload file to storage: ' + uploadError.message);
                     clearStagedMedia();
                     return;
                 }
