@@ -921,18 +921,24 @@
             bubble.className = `flex flex-col ${isMe ? 'items-end' : 'items-start'} mb-2 relative select-none`;
             if (msg.id) bubble.setAttribute('data-id', msg.id);
 
-            // --- Long press detection ---
+            // --- Long press detection (1 second requirement + blocking default context/selection menus) ---
             let pressTimer = null;
-            const startPress = () => {
-                pressTimer = setTimeout(() => openMessageOptions(msg), 600);
-            };
-            const cancelPress = () => {
+            const startPress = (e) => {
+                e.preventDefault(); // Prevent browser long press context menus / text highlights
                 if (pressTimer) clearTimeout(pressTimer);
+                pressTimer = setTimeout(() => openMessageOptions(msg), 1000); // 1 second duration
+            };
+            const cancelPress = (e) => {
+                if (pressTimer) {
+                    clearTimeout(pressTimer);
+                    pressTimer = null;
+                }
             };
 
-            bubble.addEventListener('touchstart', startPress);
+            bubble.addEventListener('touchstart', startPress, { passive: false });
             bubble.addEventListener('touchend', cancelPress);
             bubble.addEventListener('touchmove', cancelPress);
+            bubble.addEventListener('contextmenu', (e) => e.preventDefault()); // Block standard right-click context menu
             bubble.addEventListener('mousedown', startPress);
             bubble.addEventListener('mouseup', cancelPress);
             bubble.addEventListener('mouseleave', cancelPress);
@@ -941,7 +947,7 @@
             let touchStartX = 0;
             bubble.addEventListener('touchstart', (e) => {
                 touchStartX = e.touches[0].clientX;
-            });
+            }, { passive: true });
             bubble.addEventListener('touchend', (e) => {
                 const touchEndX = e.changedTouches[0].clientX;
                 if (touchEndX - touchStartX > 70) {
