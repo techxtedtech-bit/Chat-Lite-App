@@ -87,13 +87,6 @@
 
         <div id="user-profile-modal" class="hidden absolute inset-0 bg-slate-950/80 z-50 flex flex-col justify-end backdrop-blur-sm">
             <div class="bg-slate-900 border-t border-slate-800 rounded-t-3xl p-5 shadow-2xl flex flex-col gap-4 max-h-[85vh] overflow-y-auto animate-in slide-in-from-bottom duration-200 relative">
-                
-                <div id="profile-scoped-modal" class="hidden absolute inset-0 bg-slate-900/95 z-30 flex flex-col items-center justify-center p-4 rounded-t-3xl text-center gap-3">
-                    <h3 id="profile-modal-alert-title" class="font-bold text-sm text-white">Notice</h3>
-                    <p id="profile-modal-alert-message" class="text-xs text-slate-300 leading-relaxed">Alert message here...</p>
-                    <div id="profile-modal-alert-actions" class="flex items-center justify-center gap-2 pt-2"></div>
-                </div>
-
                 <div class="flex justify-between items-center pb-2 border-b border-slate-800">
                     <h3 class="font-bold text-sm text-white">User Profile</h3>
                     <button onclick="closeUserProfileModal()" class="text-slate-400 hover:text-white text-lg cursor-pointer px-2">&times;</button>
@@ -195,7 +188,6 @@
 
     <script src="supabase.js"></script>
     <script>
-        // Register Service Worker
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('./sw.js')
@@ -548,7 +540,8 @@
 
             const bubble = document.createElement('div');
             const hasReactions = msg.reactions && Object.keys(msg.reactions).length > 0;
-            // Added pb-5 when reactions are present so the reaction tag never covers or overlaps text
+            
+            // Added pb-5 when reactions are present so the reaction badge never overlaps or covers text
             bubble.className = `flex-1 px-3 py-2 ${hasReactions ? 'pb-5' : ''} rounded-2xl text-sm relative ${isMe ? 'bg-indigo-600 text-white rounded-br-none' : 'bg-slate-800 text-slate-100 rounded-bl-none border border-slate-700/50'}`;
 
             if (msg.reply_to) {
@@ -774,11 +767,7 @@
             deleteForMeBtn.textContent = '🗑️ Delete for me';
             deleteForMeBtn.onclick = () => {
                 closeMessageOptions();
-                let hiddenForMe = [];
-                try { hiddenForMe = JSON.parse(localStorage.getItem(`chatlite_deleted_for_me_${currentUser.username}_${targetUsername}`) || '[]'); } catch(e) {}
-                hiddenForMe.push(msg.id);
-                localStorage.setItem(`chatlite_deleted_for_me_${currentUser.username}_${targetUsername}`, JSON.stringify(hiddenForMe));
-                renderMessages(messagesCache, false);
+                triggerDeleteForMeWithUndo(msg);
             };
             actionsContainer.appendChild(deleteForMeBtn);
 
@@ -802,38 +791,51 @@
             document.getElementById('message-options-modal').classList.add('hidden');
         }
 
-        // --- FORWARD MESSAGE FEATURE ---
-        async function forwardMessage(msg) {
-            const payload = {
-                sender_username: currentUser.username,
-                receiver_username: targetUsername,
+        // --- FORWARD MESSAGE FEATURE (Redirects to chatlist.html with payload) ---
+        function forwardMessage(msg) {
+            const forwardData = {
                 content: msg.content,
-                message_type: msg.message_type || 'text',
-                reply_to: null,
-                is_read: false,
-                created_at: new Date().toISOString()
+                message_type: msg.message_type || 'text'
             };
+            localStorage.setItem('chatlite_forward_payload', JSON.stringify(forwardData));
+            window.location.href = 'chatlist.html?forward=true';
+        }
 
-            if (!navigator.onLine) {
-                const queue = loadOfflineQueue();
-                queue.push({ ...payload, is_offline_pending: true });
-                saveOfflineQueue(queue);
-                renderMessages(messagesCache, true);
-                showCustomAlert('Forwarded', 'Message forwarded (offline queued).');
-                return;
-            }
+        // --- DELETE FOR ME WITH 10s UNDO FEATURE ---
+        function triggerDeleteForMeWithUndo(msg) {
+            undoTargetMessage = msg;
+            undoSecondsLeft = 10;
+            
+            let hiddenForMe = [];
+            try { 
+                hiddenForMe = JSON.parse(localStorage.getItem(`chatlite_deleted_for_me_${currentUser.username}_${targetUsername}`) || '[]'); 
+            } catch(e) {}
+            
+            hiddenForMe.push(msg.id);
+            localStorage.setItem(`chatlite_deleted_for_me_${currentUser.username}_${targetUsername}`, JSON.stringify(hiddenForMe));
+            renderMessages(messagesCache, false);
 
-            const { data, error } = await supabaseClient.from('messages').insert([payload]).select();
-            if (!error && data && data.length > 0) {
-                if (!messagesCache.some(m => m.id === data[0].id)) {
-                    messagesCache.push(data[0]);
-                    saveLocalCache(messagesCache);
-                    renderMessages(messagesCache, true);
+            const banner = document.getElementById('undo-banner');
+            const countdownEl = document.getElementById('undo-countdown');
+            countdownEl.textContent = undoSecondsLeft;
+            banner.classList.remove('hidden');
+            banner.classList.add('flex');
+
+            if (undoCountdownInterval) clearInterval(undoCountdownInterval);
+            if (pendingDeleteTimer) clearTimeout(pendingDeleteTimer);
+
+            undoCountdownInterval = setInterval(() => {
+                undoSecondsLeft--;
+                countdownEl.textContent = undoSecondsLeft;
+                if (undoSecondsLeft <= 0) {
+                    clearInterval(undoCountdownInterval);
                 }
-                showCustomAlert('Forwarded', 'Message forwarded successfully!');
-            } else {
-                showCustomAlert('Error', 'Failed to forward message.');
-            }
+            }, 1000);
+
+            pendingDeleteTimer = setTimeout(() => {
+                hideUndoBanner();
+                undoTargetMessage = null;
+            }, 10000);
         }
 
         // --- DELETE FOR EVERYONE & 10s UNDO FEATURE ---
@@ -841,7 +843,6 @@
             undoTargetMessage = msg;
             undoSecondsLeft = 10;
             
-            // Mark deleted locally and hide immediately
             msg.is_deleted_for_everyone = true;
             saveLocalCache(messagesCache);
             renderMessages(messagesCache, false);
@@ -881,6 +882,16 @@
             if (undoCountdownInterval) clearInterval(undoCountdownInterval);
             if (pendingDeleteTimer) clearTimeout(pendingDeleteTimer);
             hideUndoBanner();
+
+            let hiddenForMe = [];
+            try { 
+                hiddenForMe = JSON.parse(localStorage.getItem(`chatlite_deleted_for_me_${currentUser.username}_${targetUsername}`) || '[]'); 
+            } catch(e) {}
+
+            if (hiddenForMe.includes(undoTargetMessage.id)) {
+                hiddenForMe = hiddenForMe.filter(id => id !== undoTargetMessage.id);
+                localStorage.setItem(`chatlite_deleted_for_me_${currentUser.username}_${targetUsername}`, JSON.stringify(hiddenForMe));
+            }
 
             undoTargetMessage.is_deleted_for_everyone = false;
             saveLocalCache(messagesCache);
