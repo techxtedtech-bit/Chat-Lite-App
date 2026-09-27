@@ -541,7 +541,6 @@
             const bubble = document.createElement('div');
             const hasReactions = msg.reactions && Object.keys(msg.reactions).length > 0;
             
-            // Added pb-5 when reactions are present so the reaction badge never overlaps or covers text
             bubble.className = `flex-1 px-3 py-2 ${hasReactions ? 'pb-5' : ''} rounded-2xl text-sm relative ${isMe ? 'bg-indigo-600 text-white rounded-br-none' : 'bg-slate-800 text-slate-100 rounded-bl-none border border-slate-700/50'}`;
 
             if (msg.reply_to) {
@@ -554,22 +553,31 @@
             const contentBody = document.createElement('div');
             const type = msg.message_type || 'text';
             
-            if (type === 'image') {
-                contentBody.innerHTML = `<img src="${msg.content}" class="rounded-xl max-h-60 w-full object-cover cursor-pointer" onclick="window.open('${msg.content}')">`;
-            } else if (type === 'video') {
-                contentBody.innerHTML = `<video src="${msg.content}" controls class="rounded-xl max-h-60 w-full"></video>`;
-            } else if (type === 'audio') {
-                contentBody.innerHTML = `<audio src="${msg.content}" controls class="h-10 w-full"></audio>`;
+            if (type === 'image' || type === 'video' || msg.content.match(/\.(jpeg|jpg|gif|png|webp|webm|mp4)$/i)) {
+                const isVideo = type === 'video' || msg.content.match(/\.(webm|mp4)$/i);
+                const mediaId = `media_node_${Math.random().toString(36).substring(2, 9)}`;
+                
+                contentBody.innerHTML = `
+                    <div id="${mediaId}" class="relative rounded-xl overflow-hidden bg-slate-950 flex flex-col items-center justify-center max-h-60 w-full min-h-[140px] border border-slate-800">
+                        <div class="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/80 backdrop-blur-xs p-3 z-10 download-overlay">
+                            <span class="text-xs text-slate-300 font-medium mb-2 text-center truncate w-full">${isVideo ? '📹 Video Attachment' : '🖼️ Image Attachment'}</span>
+                            <button type="button" onclick="downloadAndRenderMedia('${msg.content}', '${isVideo ? 'video' : 'image'}', '${mediaId}')" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-lg flex items-center gap-2 cursor-pointer transition-transform hover:scale-105">
+                                ⬇️ Download to View
+                            </button>
+                        </div>
+                        <div class="media-container w-full h-full flex items-center justify-center"></div>
+                    </div>
+                `;
+            } else if (type === 'audio' || msg.content.includes('voice_note_') || msg.content.endsWith('.webm')) {
+                contentBody.innerHTML = `<audio src="${msg.content}" controls preload="metadata" class="h-10 w-full"></audio>`;
             } else if (type === 'file') {
                 contentBody.innerHTML = `<a href="${msg.content}" target="_blank" download class="flex items-center gap-2 underline text-xs font-semibold py-1">📁 Download File Attachment</a>`;
             } else {
                 if (msg.content.includes('/storage/v1/object/public/chat-media/')) {
-                    if (msg.content.endsWith('.webm') || msg.content.endsWith('.mp4') || msg.content.includes('voice_')) {
-                        contentBody.innerHTML = `<audio src="${msg.content}" controls class="h-10 w-full"></audio>`;
-                    } else if (msg.content.match(/\.(jpeg|jpg|gif|png|webp)$/i)) {
-                        contentBody.innerHTML = `<img src="${msg.content}" class="rounded-xl max-h-60 w-full object-cover cursor-pointer" onclick="window.open('${msg.content}')">`;
+                    if (msg.content.includes('voice_') || msg.content.endsWith('.webm')) {
+                        contentBody.innerHTML = `<audio src="${msg.content}" controls preload="metadata" class="h-10 w-full"></audio>`;
                     } else {
-                        contentBody.innerHTML = `<a href="${msg.content}" target="_blank" download class="flex items-center gap-2 underline text-xs font-semibold py-1">📁 Download File Attachment</a>`;
+                        contentBody.textContent = msg.content;
                     }
                 } else {
                     contentBody.textContent = msg.content;
@@ -586,7 +594,7 @@
 
             if (hasReactions) {
                 const reactionBadge = document.createElement('div');
-                reactionBadge.className = `absolute bottom-1 ${isMe ? 'right-2' : 'left-2'} bg-slate-900 border border-slate-700 rounded-full px-2 py-0.5 text-[11px] flex items-center gap-1 shadow z-10`;
+                reactionBadge.className = `absolute bottom-1 ${isMe ? 'right-2' : 'left-2'} bg-slate-900 border border-slate-700 rounded-full px-2 py-0.5 text-[11px] flex items-center gap-1 shadow z-20`;
                 let reactionHtml = '';
                 for (const [emoji, users] of Object.entries(msg.reactions)) {
                     if (users && users.length > 0) {
@@ -621,6 +629,21 @@
             wrapper.appendChild(rowFlex);
             wrapper.appendChild(metaRow);
             container.appendChild(wrapper);
+        }
+
+        function downloadAndRenderMedia(url, mediaType, containerId) {
+            const wrapper = document.getElementById(containerId);
+            if (!wrapper) return;
+
+            const overlay = wrapper.querySelector('.download-overlay');
+            const targetContainer = wrapper.querySelector('.media-container');
+            if (overlay) overlay.remove();
+
+            if (mediaType === 'video') {
+                targetContainer.innerHTML = `<video src="${url}" controls class="rounded-xl max-h-60 w-full object-cover"></video>`;
+            } else {
+                targetContainer.innerHTML = `<img src="${url}" class="rounded-xl max-h-60 w-full object-cover cursor-pointer" onclick="window.open('${url}')">`;
+            }
         }
 
         function handleTypingInput() {
@@ -791,7 +814,7 @@
             document.getElementById('message-options-modal').classList.add('hidden');
         }
 
-        // --- FORWARD MESSAGE FEATURE (Redirects to chatlist.html with payload) ---
+        // --- AUTHORIZED FORWARD FEATURE ---
         function forwardMessage(msg) {
             const forwardData = {
                 content: msg.content,
@@ -910,12 +933,14 @@
             if (!activeSelectedMessageForOptions || !activeSelectedMessageForOptions.id) return;
             
             const msgId = activeSelectedMessageForOptions.id;
-            const msg = messagesCache.find(m => m.id === msgId) || activeSelectedMessageForOptions;
+            const targetMsg = messagesCache.find(m => m.id === msgId);
             closeMessageOptions();
 
+            if (!targetMsg) return;
+
             let reactions = {};
-            if (msg.reactions && typeof msg.reactions === 'object') {
-                reactions = JSON.parse(JSON.stringify(msg.reactions));
+            if (targetMsg.reactions && typeof targetMsg.reactions === 'object') {
+                reactions = JSON.parse(JSON.stringify(targetMsg.reactions));
             }
 
             if (!reactions[emoji]) reactions[emoji] = [];
@@ -927,7 +952,7 @@
                 if (reactions[emoji].length === 0) delete reactions[emoji];
             }
 
-            msg.reactions = reactions;
+            targetMsg.reactions = reactions;
             saveLocalCache(messagesCache);
             renderMessages(messagesCache, false);
 
@@ -935,7 +960,7 @@
                 const { error } = await supabaseClient
                     .from('messages')
                     .update({ reactions: reactions })
-                    .eq('id', msg.id);
+                    .eq('id', targetMsg.id);
 
                 if (error) {
                     console.error('Failed to sync reaction to Supabase:', error.message);
@@ -1092,7 +1117,7 @@
             let messageType = 'file';
             if (file.type.startsWith('image/')) messageType = 'image';
             else if (file.type.startsWith('video/')) messageType = 'video';
-            else if (file.type.startsWith('audio/')) messageType = 'audio';
+            else if (file.type.startsWith('audio/') || file.name.includes('voice_note_')) messageType = 'audio';
 
             const { data: uploadData, error: uploadError } = await supabaseClient.storage
                 .from('chat-media')
@@ -1147,7 +1172,7 @@
 
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                mediaRecorder = new MediaRecorder(stream);
+                mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
                 audioChunks = [];
 
                 mediaRecorder.ondataavailable = (event) => {
@@ -1160,7 +1185,7 @@
                     
                     document.getElementById('media-preview-bar').classList.remove('hidden');
                     document.getElementById('media-preview-bar').classList.add('flex');
-                    document.getElementById('preview-container').innerHTML = `<audio src="${URL.createObjectURL(audioBlob)}" controls class="h-8 w-full"></audio>`;
+                    document.getElementById('preview-container').innerHTML = `<audio src="${URL.createObjectURL(audioBlob)}" controls preload="metadata" class="h-8 w-full"></audio>`;
                     document.getElementById('upload-status-text').textContent = "Voice note ready. Tap Send to dispatch.";
                 };
 
