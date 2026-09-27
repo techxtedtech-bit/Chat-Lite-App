@@ -146,6 +146,21 @@
             <span class="text-[10px] text-slate-400 text-center" id="upload-status-text">Ready. Hit Send button to upload & deliver.</span>
         </div>
 
+        <div id="emoji-picker-panel" class="hidden bg-slate-900 border-t border-slate-800 p-2 z-30 flex-col gap-2 flex-shrink-0">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-1.5 px-1">
+                <div class="flex gap-2 text-sm" id="emoji-category-tabs">
+                    <button type="button" onclick="switchEmojiCategory('smileys')" class="px-2 py-1 rounded bg-slate-800 text-xs text-indigo-300 cursor-pointer">😀 Smileys</button>
+                    <button type="button" onclick="switchEmojiCategory('animals')" class="px-2 py-1 rounded hover:bg-slate-800 text-xs text-slate-400 cursor-pointer">🐶 Animals</button>
+                    <button type="button" onclick="switchEmojiCategory('food')" class="px-2 py-1 rounded hover:bg-slate-800 text-xs text-slate-400 cursor-pointer">🍎 Food</button>
+                    <button type="button" onclick="switchEmojiCategory('activities')" class="px-2 py-1 rounded hover:bg-slate-800 text-xs text-slate-400 cursor-pointer">⚽ Activities</button>
+                    <button type="button" onclick="switchEmojiCategory('symbols')" class="px-2 py-1 rounded hover:bg-slate-800 text-xs text-slate-400 cursor-pointer">💡 Symbols</button>
+                </div>
+                <button type="button" onclick="toggleEmojiPicker()" class="text-slate-400 hover:text-white text-sm px-1 cursor-pointer">&times;</button>
+            </div>
+            <div id="emoji-grid-container" class="grid grid-cols-8 gap-1.5 max-h-36 overflow-y-auto p-1 bg-slate-950 rounded-xl border border-slate-800 text-lg text-center">
+                </div>
+        </div>
+
         <input type="file" id="media-file-input" class="hidden" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.txt" onchange="stageFileSelected(event)">
         <input type="file" id="camera-photo-input" class="hidden" accept="image/*" capture="environment" onchange="stageFileSelected(event)">
         <input type="file" id="camera-video-input" class="hidden" accept="video/*" capture="environment" onchange="stageFileSelected(event)">
@@ -166,6 +181,7 @@
 
         <form id="chat-form" onsubmit="handleFormSubmit(event)" class="p-3 bg-slate-900 border-t border-slate-800 flex items-center gap-2 relative z-25 flex-shrink-0">
             <button type="button" id="attach-btn" onclick="toggleAttachmentMenu()" class="p-2 text-slate-400 hover:text-indigo-400 transition-colors text-lg font-bold cursor-pointer flex-shrink-0" title="Attach Media">+</button>
+            <button type="button" id="emoji-btn" onclick="toggleEmojiPicker()" class="p-2 text-slate-400 hover:text-amber-400 transition-colors text-base cursor-pointer flex-shrink-0" title="Emojis">😊</button>
             
             <input type="text" id="message-input" placeholder="Type a message..." oninput="handleTypingInput()" class="flex-1 px-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl focus:outline-none focus:border-indigo-500 text-sm text-white min-w-0">
             
@@ -235,6 +251,58 @@
         let undoCountdownInterval = null;
         let undoSecondsLeft = 10;
         let typingTimeout = null;
+
+        // Emoji definitions
+        const emojiCategories = {
+            smileys: ["😀", "😃", "😄", "😁", "😆", "😅", "🤣", "😂", "🙂", "🙃", "😉", "😊", "😇", "🥰", "😍", "🤩", "😘", "😗", "😚", "😙", "😋", "😛", "😜", "🤪", "😝", "🤑", "🤗", "🤭", "🤫", "🤔", "🤐", "🤨", "😐", "😑", "😶", "😏", "😒", "🙄", "😬", "😮‍💨", "🤥", "😌", "😔", "😪", "🤤", "😴", "😷", "🤒", "🤕", "🤢", "🤮", "🤧", "hot", "🥶", "🥴", "😵", "🤯", "🤠", "🥳", "😎", "🤓", "🧐", "😕", "😟", "🙁", "😮", "😯", "😲", "😳", "🥺", "ğine", "😦", "😧", "😨", "😰", "😥", "😢", "😭", "😱", "😖", "😣", "😞", "😓", "😩", "😫", "🥱", "😤", "😡", "😠", "🤬", "😈", "👿", "💀", "💩", "🤡", "👹", "👺", "👻", "👽", "👾", "🤖", "😺", "😸", "😹", "😻", "😼", "😽", "🙀", "😿", "😾", "👋", "🤚", "🖐️", "✋", "🖖", "👌", "🤌", "🤏", "✌️", "🤞", "🫰", "🤟", "🤘", "🤙", "👈", "👉", "👆", "🖕", "👇", "☝️", "👍", "👎", "✊", "👊", "🤛", "🤜", "👏", "🙌", "👐", "🤲", "🤝", "🙏", "✍️", "💅", "SELFIE", "💪", "🦾"],
+            animals: ["🐶", "🐱", "🐭", "🐹", "🐰", "🦊", "🐻", "🐼", "🐨", "🐯", "🦁", "🐮", "🐷", "🐸", "🐵", "🐔", "🐧", "🐦", "🐤", "🐣", "🐥", "🦆", "🦅", "🦉", "🦇", "🐺", "🐗", "🐴", "🦄", "🐝", "🪱", "🐛", "🦋", "snail", "🐞", "🐜", "🪰", "🪲", "cockroach", "🦟", "🦗", "🕷️", "🕸️", "🦂", "🐢", "🐍", "LIZARD", "🐙", "🦑", "🦐", "🦞", "🦀", "🐡", "🐠", "🐟", "🐬", "🐳", "🐋", "🦈", "🐊", "🐅", "🐆", "🦓", "🦍", "🦧", "🐘", "🦛", "rhinoceros", "🐪", "🐫", "giraffe", "kangaroo", "bison", "buffalo"],
+            food: ["🍏", "🍎", "🍐", "🍊", "🍋", "🍌", "🍉", "🍇", "🍓", "🫐", "🍈", "🍒", "🍑", "mango", "🍍", "🥥", "🥝", "🍅", "🍆", "avocado", "broccoli", "leafy green", "cucumber", "bell pepper", "carrot", "garlic", "onion", "potato", "yam", "croissant", "bagel", "bread", "pretzel", "cheese", "egg", "cooking", "butter", "pancake", "waffle", "bacon", "cutlery", "hot dog", "burger", "fries", "pizza", "sandwich", "taco", "burrito", "tamale", "stuffed flatbread", "falafel", "eggplant", "bowl with spoon", "green salad", "popcorn", "canned food", "bento box", "rice cracker", "rice ball", "rice", "curry rice", "steaming bowl", "spaghetti", "roasted sweet potato", "oden", "sushi", "fried shrimp", "fish cake", "moon cake", "dango", "dumpling", "fortune cookie", "takeout box", "crab", "lobster", "squid", "oyster", "ice cream", "shaved ice", "ice cream", "doughnut", "cookie", "birthday cake", "shortcake", "cupcake", "pie", "chocolate bar", "candy", "lollipop", "custard", "honey pot", "baby bottle", "glass of milk", "tea", "sake", "champagne glass", "wine glass", "cocktail glass", "tropical drink", "beer mug", "cheers", "clinking glasses", "tumbler glass", "cup with straw", "beverage box", "mate", "ice cube", "chopsticks"],
+            activities: ["⚽", "🏀", "🏈", "⚾", "🥎", "🎾", "🏐", "🏉", "🥏", "🎱", "🪀", "🏓", "🏸", "🏒", "🏑", "🥍", "🏏", "🪃", "🥅", "⛳", "🪁", "🏹", "🎣", "🤿", "boxing glove", "martial arts uniform", "skateboard", "roller skate", "sled", "ice skate", "curling stone", "skis", "snowboard", "parachute", "person lifting weights", "person fencing", "horse racing", "mountain biker", "person rowing boat", "swimmer", "surfer", "person in steamy room", "person climbing", "person bouncing ball", "person cartwheeling", "person playing handball", "person juggling", "trophy", "medal", "1st place medal", "2nd place medal", "3rd place medal", "ticket", "admission tickets", "circus tent", "juggling", "performing arts", "artist palette", "clapper board", "microphone", "headphone", "saxophone", "accordion", "guitar", "musical keyboard", "trumpet", "violin", "banjo", "drum", "long drum", "game controller", "slot machine", "game die", "jigsaw", "teddy bear", "piñata", "magic wand", "pinata", "nesting dolls", "spade", "heart", "diamond", "club", "chess pawn", "black joker", "mahjong red dragon", "flower playing cards"],
+            symbols: ["❤️", "🧡", "💛", "💚", "💙", "💜", "🖤", "🤍", "🤎", "💔", "❤️‍🔥", "❤️‍🩹", "💕", "💞", "💓", "💗", "💖", "💘", "💝", "", "💯", "💢", "💥", "💫", "💦", "💨", "🕳️", "💬", "👁️‍🗨️", "🗨️", "🗯️", "💭", "💤", "🏁", "🚩", "🎌", "🏴", "white flag", "rainbow flag", "pirate flag", "A button", "B button", "O button", "P", "AB button", "CL button", "FREE button", "ID", "NEW", "NG", "OK", "SOS", "UP!", "VS", "red circle", "orange circle", "yellow circle", "green circle", "blue circle", "purple circle", "brown circle", "black circle", "white circle", "red square", "orange square", "yellow square", "green square", "blue square", "purple square", "brown square", "black square", "white square", "large orange diamond", "large blue diamond", "small orange diamond", "small blue diamond", "red triangle pointed up", "red triangle pointed down", "diamond with a dot", "radio button", "currency exchange", "heavy dollar sign"]
+        };
+
+        let currentEmojiCategory = 'smileys';
+
+        function toggleEmojiPicker() {
+            const panel = document.getElementById('emoji-picker-panel');
+            const isHidden = panel.classList.contains('hidden');
+            if (isHidden) {
+                panel.classList.remove('hidden');
+                panel.classList.add('flex');
+                renderEmojis(currentEmojiCategory);
+            } else {
+                panel.classList.remove('flex');
+                panel.classList.add('hidden');
+            }
+        }
+
+        function switchEmojiCategory(category) {
+            currentEmojiCategory = category;
+            const tabs = document.getElementById('emoji-category-tabs').children;
+            for (let tab of tabs) {
+                tab.className = "px-2 py-1 rounded hover:bg-slate-800 text-xs text-slate-400 cursor-pointer";
+            }
+            event.target.className = "px-2 py-1 rounded bg-slate-800 text-xs text-indigo-300 cursor-pointer";
+            renderEmojis(category);
+        }
+
+        function renderEmojis(category) {
+            const grid = document.getElementById('emoji-grid-container');
+            grid.innerHTML = '';
+            const list = emojiCategories[category] || emojiCategories['smileys'];
+            list.forEach(emoji => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'hover:scale-125 transition-transform cursor-pointer p-1';
+                btn.textContent = emoji;
+                btn.onclick = () => {
+                    const input = document.getElementById('message-input');
+                    input.value += emoji;
+                    input.focus();
+                };
+                grid.appendChild(btn);
+            });
+        }
 
         if (messagesCache.length > 0) {
             renderMessages(messagesCache, true);
@@ -562,13 +630,48 @@
                     </div>
                 `;
             } else if (type === 'audio' || msg.content.includes('voice_note_') || msg.content.endsWith('.webm')) {
-                contentBody.innerHTML = `<audio src="${msg.content}" controls preload="metadata" class="h-10 w-full"></audio>`;
+                // Compact WhatsApp-style voice note architecture
+                const uniqueAudioId = 'audio_' + Math.random().toString(36).substring(2, 9);
+                contentBody.innerHTML = `
+                    <div class="flex items-center gap-2.5 py-1 min-w-[200px]" data-audio-url="${msg.content}">
+                        <button type="button" onclick="toggleVoiceNotePlay('${uniqueAudioId}')" id="play_btn_${uniqueAudioId}" class="w-8 h-8 rounded-full ${isMe ? 'bg-white text-indigo-600' : 'bg-indigo-600 text-white'} flex items-center justify-center text-xs font-bold cursor-pointer flex-shrink-0 shadow">▶</button>
+                        <div class="flex-1 flex flex-col gap-1">
+                            <div class="flex items-center gap-1 h-3 cursor-pointer" onclick="seekVoiceNote(event, '${uniqueAudioId}')">
+                                <div class="w-full bg-slate-600/50 h-1.5 rounded-full overflow-hidden relative">
+                                    <div id="progress_${uniqueAudioId}" class="bg-current h-full w-0 transition-all"></div>
+                                </div>
+                            </div>
+                            <div class="flex justify-between items-center text-[10px] opacity-80">
+                                <span id="timer_${uniqueAudioId}">0:00</span>
+                                <span>Voice Note</span>
+                            </div>
+                        </div>
+                        <audio id="${uniqueAudioId}" src="${msg.content}" preload="metadata" ontimeupdate="updateVoiceNoteProgress('${uniqueAudioId}')" onended="resetVoiceNotePlayer('${uniqueAudioId}')" class="hidden"></audio>
+                    </div>
+                `;
             } else if (type === 'file') {
                 contentBody.innerHTML = `<a href="${msg.content}" target="_blank" download class="flex items-center gap-2 underline text-xs font-semibold py-1">📁 Download File Attachment</a>`;
             } else {
                 if (msg.content.includes('/storage/v1/object/public/chat-media/')) {
                     if (msg.content.includes('voice_') || msg.content.endsWith('.webm')) {
-                        contentBody.innerHTML = `<audio src="${msg.content}" controls preload="metadata" class="h-10 w-full"></audio>`;
+                        const uniqueAudioId = 'audio_' + Math.random().toString(36).substring(2, 9);
+                        contentBody.innerHTML = `
+                            <div class="flex items-center gap-2.5 py-1 min-w-[200px]" data-audio-url="${msg.content}">
+                                <button type="button" onclick="toggleVoiceNotePlay('${uniqueAudioId}')" id="play_btn_${uniqueAudioId}" class="w-8 h-8 rounded-full ${isMe ? 'bg-white text-indigo-600' : 'bg-indigo-600 text-white'} flex items-center justify-center text-xs font-bold cursor-pointer flex-shrink-0 shadow">▶</button>
+                                <div class="flex-1 flex flex-col gap-1">
+                                    <div class="flex items-center gap-1 h-3 cursor-pointer" onclick="seekVoiceNote(event, '${uniqueAudioId}')">
+                                        <div class="w-full bg-slate-600/50 h-1.5 rounded-full overflow-hidden relative">
+                                            <div id="progress_${uniqueAudioId}" class="bg-current h-full w-0 transition-all"></div>
+                                        </div>
+                                    </div>
+                                    <div class="flex justify-between items-center text-[10px] opacity-80">
+                                        <span id="timer_${uniqueAudioId}">0:00</span>
+                                        <span>Voice Note</span>
+                                    </div>
+                                </div>
+                                <audio id="${uniqueAudioId}" src="${msg.content}" preload="metadata" ontimeupdate="updateVoiceNoteProgress('${uniqueAudioId}')" onended="resetVoiceNotePlayer('${uniqueAudioId}')" class="hidden"></audio>
+                            </div>
+                        `;
                     } else {
                         contentBody.textContent = msg.content;
                     }
@@ -622,6 +725,63 @@
             wrapper.appendChild(rowFlex);
             wrapper.appendChild(metaRow);
             container.appendChild(wrapper);
+        }
+
+        // Voice note player control functions
+        function toggleVoiceNotePlay(audioId) {
+            const audioElement = document.getElementById(audioId);
+            const playBtn = document.getElementById(`play_btn_${audioId}`);
+            if (!audioElement) return;
+
+            if (audioElement.paused) {
+                audioElement.play();
+                playBtn.textContent = '⏸';
+            } else {
+                audioElement.pause();
+                playBtn.textContent = '▶';
+            }
+        }
+
+        function updateVoiceNoteProgress(audioId) {
+            const audioElement = document.getElementById(audioId);
+            const progressBar = document.getElementById(`progress_${audioId}`);
+            const timerEl = document.getElementById(`timer_${audioId}`);
+            if (!audioElement || !progressBar || !timerEl) return;
+
+            if (audioElement.duration) {
+                const percent = (audioElement.currentTime / audioElement.duration) * 100;
+                progressBar.style.width = `${percent}%`;
+
+                const currentSecs = Math.floor(audioElement.currentTime);
+                const mins = Math.floor(currentSecs / 60);
+                const secs = currentSecs % 60;
+                timerEl.textContent = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+            }
+        }
+
+        function resetVoiceNotePlayer(audioId) {
+            const playBtn = document.getElementById(`play_btn_${audioId}`);
+            const progressBar = document.getElementById(`progress_${audioId}`);
+            const timerEl = document.getElementById(`timer_${audioId}`);
+            if (playBtn) playBtn.textContent = '▶';
+            if (progressBar) progressBar.style.width = '0%';
+            const audioElement = document.getElementById(audioId);
+            if (audioElement && timerEl && audioElement.duration) {
+                const totalSecs = Math.floor(audioElement.duration);
+                const mins = Math.floor(totalSecs / 60);
+                const secs = totalSecs % 60;
+                timerEl.textContent = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+            }
+        }
+
+        function seekVoiceNote(event, audioId) {
+            const audioElement = document.getElementById(audioId);
+            if (!audioElement || !audioElement.duration) return;
+            const rect = event.currentTarget.getBoundingClientRect();
+            const clickX = event.clientX - rect.left;
+            const width = rect.width;
+            const clickRatio = Math.max(0, Math.min(1, clickX / width));
+            audioElement.currentTime = clickRatio * audioElement.duration;
         }
 
         function handleTypingInput() {
