@@ -241,6 +241,7 @@
         let pendingDeleteTimer = null;
         let undoTargetMessage = null;
         let undoCountdownInterval = null;
+        let undoSecondsLeft = 10;
         let typingTimeout = null;
 
         if (messagesCache.length > 0) {
@@ -382,7 +383,6 @@
                 .order('created_at', { ascending: true });
 
             if (!error && messages) {
-                // Check if message count or reactions changed before re-rendering unnecessarily
                 const cachedString = JSON.stringify(messagesCache);
                 const fetchedString = JSON.stringify(messages);
                 if (cachedString !== fetchedString) {
@@ -425,8 +425,6 @@
 
         function renderMessages(messages, forceScroll = false) {
             const container = document.getElementById('chat-messages');
-            
-            // Check if user is currently near the bottom (within 100px)
             const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 150;
 
             container.innerHTML = '';
@@ -455,7 +453,6 @@
                 appendMessageToDOM(msg);
             });
 
-            // Only scroll to bottom if forced (e.g. initial load or message sent) or user was already at the bottom
             if (forceScroll || isNearBottom) {
                 container.scrollTop = container.scrollHeight;
             }
@@ -550,8 +547,8 @@
             });
 
             const bubble = document.createElement('div');
-            // Added pb-5 if reactions exist so text never overlaps or gets blocked by reaction badges
             const hasReactions = msg.reactions && Object.keys(msg.reactions).length > 0;
+            // Added pb-5 when reactions are present so the reaction tag never covers or overlaps text
             bubble.className = `flex-1 px-3 py-2 ${hasReactions ? 'pb-5' : ''} rounded-2xl text-sm relative ${isMe ? 'bg-indigo-600 text-white rounded-br-none' : 'bg-slate-800 text-slate-100 rounded-bl-none border border-slate-700/50'}`;
 
             if (msg.reply_to) {
@@ -594,7 +591,6 @@
                 contentBody.appendChild(editedTag);
             }
 
-            // Render Reactions Badge cleanly positioned without blocking text
             if (hasReactions) {
                 const reactionBadge = document.createElement('div');
                 reactionBadge.className = `absolute bottom-1 ${isMe ? 'right-2' : 'left-2'} bg-slate-900 border border-slate-700 rounded-full px-2 py-0.5 text-[11px] flex items-center gap-1 shadow z-10`;
@@ -634,7 +630,6 @@
             container.appendChild(wrapper);
         }
 
-        // --- REAL-TIME INSTANT MESSAGE LISTENER ---
         function handleTypingInput() {
             if (!navigator.onLine) return;
             supabaseClient.channel(`typing_${currentUser.username}_${targetUsername}`).send({
@@ -748,6 +743,12 @@
             replyBtn.onclick = () => { closeMessageOptions(); setReplyTarget(msg); };
             actionsContainer.appendChild(replyBtn);
 
+            const forwardBtn = document.createElement('button');
+            forwardBtn.className = 'w-full text-left px-3 py-2 text-xs font-medium text-slate-200 hover:bg-slate-800 rounded-xl cursor-pointer';
+            forwardBtn.textContent = '↗️ Forward Message';
+            forwardBtn.onclick = () => { closeMessageOptions(); forwardMessage(msg); };
+            actionsContainer.appendChild(forwardBtn);
+
             if (msg.sender_username === currentUser.username && (msg.message_type === 'text' || !msg.message_type)) {
                 const editBtn = document.createElement('button');
                 editBtn.className = 'w-full text-left px-3 py-2 text-xs font-medium text-indigo-400 hover:bg-slate-800 rounded-xl cursor-pointer';
@@ -781,6 +782,17 @@
             };
             actionsContainer.appendChild(deleteForMeBtn);
 
+            if (msg.sender_username === currentUser.username) {
+                const deleteEveryoneBtn = document.createElement('button');
+                deleteEveryoneBtn.className = 'w-full text-left px-3 py-2 text-xs font-medium text-red-400 hover:bg-slate-800 rounded-xl cursor-pointer';
+                deleteEveryoneBtn.textContent = '🗑️ Delete for everyone';
+                deleteEveryoneBtn.onclick = () => {
+                    closeMessageOptions();
+                    triggerDeleteForEveryoneWithUndo(msg);
+                };
+                actionsContainer.appendChild(deleteEveryoneBtn);
+            }
+
             modal.classList.remove('hidden');
             modal.classList.add('flex');
         }
@@ -788,6 +800,98 @@
         function closeMessageOptions() {
             document.getElementById('message-options-modal').classList.remove('flex');
             document.getElementById('message-options-modal').classList.add('hidden');
+        }
+
+        // --- FORWARD MESSAGE FEATURE ---
+        async function forwardMessage(msg) {
+            const payload = {
+                sender_username: currentUser.username,
+                receiver_username: targetUsername,
+                content: msg.content,
+                message_type: msg.message_type || 'text',
+                reply_to: null,
+                is_read: false,
+                created_at: new Date().toISOString()
+            };
+
+            if (!navigator.onLine) {
+                const queue = loadOfflineQueue();
+                queue.push({ ...payload, is_offline_pending: true });
+                saveOfflineQueue(queue);
+                renderMessages(messagesCache, true);
+                showCustomAlert('Forwarded', 'Message forwarded (offline queued).');
+                return;
+            }
+
+            const { data, error } = await supabaseClient.from('messages').insert([payload]).select();
+            if (!error && data && data.length > 0) {
+                if (!messagesCache.some(m => m.id === data[0].id)) {
+                    messagesCache.push(data[0]);
+                    saveLocalCache(messagesCache);
+                    renderMessages(messagesCache, true);
+                }
+                showCustomAlert('Forwarded', 'Message forwarded successfully!');
+            } else {
+                showCustomAlert('Error', 'Failed to forward message.');
+            }
+        }
+
+        // --- DELETE FOR EVERYONE & 10s UNDO FEATURE ---
+        async function triggerDeleteForEveryoneWithUndo(msg) {
+            undoTargetMessage = msg;
+            undoSecondsLeft = 10;
+            
+            // Mark deleted locally and hide immediately
+            msg.is_deleted_for_everyone = true;
+            saveLocalCache(messagesCache);
+            renderMessages(messagesCache, false);
+
+            const banner = document.getElementById('undo-banner');
+            const countdownEl = document.getElementById('undo-countdown');
+            countdownEl.textContent = undoSecondsLeft;
+            banner.classList.remove('hidden');
+            banner.classList.add('flex');
+
+            if (undoCountdownInterval) clearInterval(undoCountdownInterval);
+            if (pendingDeleteTimer) clearTimeout(pendingDeleteTimer);
+
+            undoCountdownInterval = setInterval(() => {
+                undoSecondsLeft--;
+                countdownEl.textContent = undoSecondsLeft;
+                if (undoSecondsLeft <= 0) {
+                    clearInterval(undoCountdownInterval);
+                }
+            }, 1000);
+
+            pendingDeleteTimer = setTimeout(async () => {
+                hideUndoBanner();
+                if (navigator.onLine && undoTargetMessage) {
+                    await supabaseClient
+                        .from('messages')
+                        .update({ is_deleted_for_everyone: true })
+                        .eq('id', undoTargetMessage.id);
+                }
+                undoTargetMessage = null;
+            }, 10000);
+        }
+
+        async function triggerUndoAction() {
+            if (!undoTargetMessage) return;
+
+            if (undoCountdownInterval) clearInterval(undoCountdownInterval);
+            if (pendingDeleteTimer) clearTimeout(pendingDeleteTimer);
+            hideUndoBanner();
+
+            undoTargetMessage.is_deleted_for_everyone = false;
+            saveLocalCache(messagesCache);
+            renderMessages(messagesCache, false);
+            undoTargetMessage = null;
+        }
+
+        function hideUndoBanner() {
+            const banner = document.getElementById('undo-banner');
+            banner.classList.remove('flex');
+            banner.classList.add('hidden');
         }
 
         // --- EMOJI REACTION HANDLER ---
@@ -812,7 +916,6 @@
                 if (reactions[emoji].length === 0) delete reactions[emoji];
             }
 
-            // Immediately update local cache & DOM without resetting scroll position
             msg.reactions = reactions;
             saveLocalCache(messagesCache);
             renderMessages(messagesCache, false);
@@ -829,7 +932,6 @@
             }
         }
 
-        // --- MESSAGE EDIT HANDLERS ---
         function setEditTarget(msg) {
             editingMessage = msg;
             const editBar = document.getElementById('edit-preview-bar');
@@ -877,7 +979,6 @@
 
             if (!content) return;
 
-            // Handle Message Editing Submission
             if (editingMessage && editingMessage.id) {
                 const msgId = editingMessage.id;
                 cancelEdit();
@@ -1158,7 +1259,6 @@
             document.getElementById('media-gallery-modal').classList.add('hidden');
         }
 
-        // Initial fetch, realtime subscription, and heartbeat polling setup
         fetchMessages(true);
         subscribeToRealtimeChannels();
 
