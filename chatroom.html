@@ -629,55 +629,42 @@
                         ${isVideo ? `<video src="${msg.content}" controls class="rounded-xl max-h-60 w-full object-cover"></video>` : `<img src="${msg.content}" class="rounded-xl max-h-60 w-full object-cover cursor-pointer" onclick="window.open('${msg.content}')">`}
                     </div>
                 `;
-            } else if (type === 'audio' || msg.content.includes('voice_note_') || msg.content.endsWith('.webm')) {
-                // Compact WhatsApp-style voice note architecture
+            } else if (type === 'audio' || msg.content.includes('voice_note_') || msg.content.endsWith('.webm') || msg.content.includes('chat-media/')) {
+                // WhatsApp-Style Voice Note Playback Engine Architecture
                 const uniqueAudioId = 'audio_' + Math.random().toString(36).substring(2, 9);
+                const senderInitial = isMe ? currentUser.username.charAt(0).toUpperCase() : targetName.charAt(0).toUpperCase();
+
+                // Generate simulated audio wave frequency bars
+                let waveformBarsHtml = '';
+                const barHeights = [12, 24, 18, 30, 22, 35, 15, 28, 38, 20, 25, 32, 16, 28, 20, 34, 25, 18, 30, 22, 12];
+                barHeights.forEach((h, idx) => {
+                    waveformBarsHtml += `<span class="w-[2.5px] rounded-full bg-current opacity-40 transition-all duration-150" style="height: ${h}px;" id="bar_${uniqueAudioId}_${idx}"></span>`;
+                });
+
                 contentBody.innerHTML = `
-                    <div class="flex items-center gap-2.5 py-1 min-w-[200px]" data-audio-url="${msg.content}">
-                        <button type="button" onclick="toggleVoiceNotePlay('${uniqueAudioId}')" id="play_btn_${uniqueAudioId}" class="w-8 h-8 rounded-full ${isMe ? 'bg-white text-indigo-600' : 'bg-indigo-600 text-white'} flex items-center justify-center text-xs font-bold cursor-pointer flex-shrink-0 shadow">▶</button>
-                        <div class="flex-1 flex flex-col gap-1">
-                            <div class="flex items-center gap-1 h-3 cursor-pointer" onclick="seekVoiceNote(event, '${uniqueAudioId}')">
-                                <div class="w-full bg-slate-600/50 h-1.5 rounded-full overflow-hidden relative">
-                                    <div id="progress_${uniqueAudioId}" class="bg-current h-full w-0 transition-all"></div>
+                    <div class="flex items-center gap-3 py-1 min-w-[220px]" data-audio-url="${msg.content}">
+                        <button type="button" onclick="toggleVoiceNotePlay('${uniqueAudioId}')" id="play_btn_${uniqueAudioId}" class="w-9 h-9 rounded-full ${isMe ? 'bg-white text-indigo-600' : 'bg-indigo-600 text-white'} flex items-center justify-center text-xs font-bold cursor-pointer flex-shrink-0 shadow-md hover:scale-105 transition-transform">▶</button>
+                        
+                        <div class="flex-1 flex flex-col gap-1.5">
+                            <div class="flex items-center gap-[3px] h-10 cursor-pointer px-1 bg-black/10 rounded-lg overflow-hidden" onclick="seekVoiceNote(event, '${uniqueAudioId}')" title="Click to seek">
+                                ${waveformBarsHtml}
+                            </div>
+                            
+                            <div class="flex justify-between items-center text-[10px] opacity-80 px-0.5">
+                                <span id="timer_${uniqueAudioId}">0:00</span>
+                                <div class="flex items-center gap-1.5 font-medium">
+                                    <span>🎤 Voice Note</span>
+                                    <div class="w-4 h-4 rounded-full ${isMe ? 'bg-indigo-500/40 text-white' : 'bg-slate-700 text-slate-300'} flex items-center justify-center text-[9px] font-bold overflow-hidden">${senderInitial}</div>
                                 </div>
                             </div>
-                            <div class="flex justify-between items-center text-[10px] opacity-80">
-                                <span id="timer_${uniqueAudioId}">0:00</span>
-                                <span>Voice Note</span>
-                            </div>
                         </div>
-                        <audio id="${uniqueAudioId}" src="${msg.content}" preload="metadata" ontimeupdate="updateVoiceNoteProgress('${uniqueAudioId}')" onended="resetVoiceNotePlayer('${uniqueAudioId}')" class="hidden"></audio>
+                        <audio id="${uniqueAudioId}" src="${msg.content}" preload="metadata" ontimeupdate="updateVoiceNoteProgress('${uniqueAudioId}', ${barHeights.length})" onended="resetVoiceNotePlayer('${uniqueAudioId}', ${barHeights.length})" class="hidden"></audio>
                     </div>
                 `;
             } else if (type === 'file') {
                 contentBody.innerHTML = `<a href="${msg.content}" target="_blank" download class="flex items-center gap-2 underline text-xs font-semibold py-1">📁 Download File Attachment</a>`;
             } else {
-                if (msg.content.includes('/storage/v1/object/public/chat-media/')) {
-                    if (msg.content.includes('voice_') || msg.content.endsWith('.webm')) {
-                        const uniqueAudioId = 'audio_' + Math.random().toString(36).substring(2, 9);
-                        contentBody.innerHTML = `
-                            <div class="flex items-center gap-2.5 py-1 min-w-[200px]" data-audio-url="${msg.content}">
-                                <button type="button" onclick="toggleVoiceNotePlay('${uniqueAudioId}')" id="play_btn_${uniqueAudioId}" class="w-8 h-8 rounded-full ${isMe ? 'bg-white text-indigo-600' : 'bg-indigo-600 text-white'} flex items-center justify-center text-xs font-bold cursor-pointer flex-shrink-0 shadow">▶</button>
-                                <div class="flex-1 flex flex-col gap-1">
-                                    <div class="flex items-center gap-1 h-3 cursor-pointer" onclick="seekVoiceNote(event, '${uniqueAudioId}')">
-                                        <div class="w-full bg-slate-600/50 h-1.5 rounded-full overflow-hidden relative">
-                                            <div id="progress_${uniqueAudioId}" class="bg-current h-full w-0 transition-all"></div>
-                                        </div>
-                                    </div>
-                                    <div class="flex justify-between items-center text-[10px] opacity-80">
-                                        <span id="timer_${uniqueAudioId}">0:00</span>
-                                        <span>Voice Note</span>
-                                    </div>
-                                </div>
-                                <audio id="${uniqueAudioId}" src="${msg.content}" preload="metadata" ontimeupdate="updateVoiceNoteProgress('${uniqueAudioId}')" onended="resetVoiceNotePlayer('${uniqueAudioId}')" class="hidden"></audio>
-                            </div>
-                        `;
-                    } else {
-                        contentBody.textContent = msg.content;
-                    }
-                } else {
-                    contentBody.textContent = msg.content;
-                }
+                contentBody.textContent = msg.content;
             }
             bubble.appendChild(contentBody);
 
@@ -727,7 +714,7 @@
             container.appendChild(wrapper);
         }
 
-        // Voice note player control functions
+        // WhatsApp-Style Voice Note Engine Controls
         function toggleVoiceNotePlay(audioId) {
             const audioElement = document.getElementById(audioId);
             const playBtn = document.getElementById(`play_btn_${audioId}`);
@@ -742,15 +729,27 @@
             }
         }
 
-        function updateVoiceNoteProgress(audioId) {
+        function updateVoiceNoteProgress(audioId, totalBars) {
             const audioElement = document.getElementById(audioId);
-            const progressBar = document.getElementById(`progress_${audioId}`);
             const timerEl = document.getElementById(`timer_${audioId}`);
-            if (!audioElement || !progressBar || !timerEl) return;
+            if (!audioElement || !timerEl) return;
 
             if (audioElement.duration) {
-                const percent = (audioElement.currentTime / audioElement.duration) * 100;
-                progressBar.style.width = `${percent}%`;
+                const ratio = audioElement.currentTime / audioElement.duration;
+                const activeBarCount = Math.floor(ratio * totalBars);
+
+                for (let i = 0; i < totalBars; i++) {
+                    const bar = document.getElementById(`bar_${audioId}_${i}`);
+                    if (bar) {
+                        if (i <= activeBarCount) {
+                            bar.classList.remove('opacity-40');
+                            bar.classList.add('opacity-100', 'scale-y-110');
+                        } else {
+                            bar.classList.remove('opacity-100', 'scale-y-110');
+                            bar.classList.add('opacity-40');
+                        }
+                    }
+                }
 
                 const currentSecs = Math.floor(audioElement.currentTime);
                 const mins = Math.floor(currentSecs / 60);
@@ -759,12 +758,19 @@
             }
         }
 
-        function resetVoiceNotePlayer(audioId) {
+        function resetVoiceNotePlayer(audioId, totalBars) {
             const playBtn = document.getElementById(`play_btn_${audioId}`);
-            const progressBar = document.getElementById(`progress_${audioId}`);
             const timerEl = document.getElementById(`timer_${audioId}`);
             if (playBtn) playBtn.textContent = '▶';
-            if (progressBar) progressBar.style.width = '0%';
+
+            for (let i = 0; i < totalBars; i++) {
+                const bar = document.getElementById(`bar_${audioId}_${i}`);
+                if (bar) {
+                    bar.classList.remove('opacity-100', 'scale-y-110');
+                    bar.classList.add('opacity-40');
+                }
+            }
+
             const audioElement = document.getElementById(audioId);
             if (audioElement && timerEl && audioElement.duration) {
                 const totalSecs = Math.floor(audioElement.duration);
