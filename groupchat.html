@@ -62,11 +62,11 @@
             <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-xs p-3 shadow-2xl flex flex-col gap-3">
                 <!-- Quick Reactions Bar Inside Modal -->
                 <div class="flex items-center justify-around bg-slate-950 p-2 rounded-xl border border-slate-800 text-lg">
-                    <button onclick="sendQuickReaction('❤️')" class="hover:scale-125 transition-transform cursor-pointer">❤️</button>
-                    <button onclick="sendQuickReaction('👍')" class="hover:scale-125 transition-transform cursor-pointer">👍</button>
-                    <button onclick="sendQuickReaction('😂')" class="hover:scale-125 transition-transform cursor-pointer">😂</button>
-                    <button onclick="sendQuickReaction('🔥')" class="hover:scale-125 transition-transform cursor-pointer">🔥</button>
-                    <button onclick="sendQuickReaction('👏')" class="hover:scale-125 transition-transform cursor-pointer">👏</button>
+                    <button type="button" onclick="sendQuickReaction('❤️')" class="hover:scale-125 transition-transform cursor-pointer">❤️</button>
+                    <button type="button" onclick="sendQuickReaction('👍')" class="hover:scale-125 transition-transform cursor-pointer">👍</button>
+                    <button type="button" onclick="sendQuickReaction('😂')" class="hover:scale-125 transition-transform cursor-pointer">😂</button>
+                    <button type="button" onclick="sendQuickReaction('🔥')" class="hover:scale-125 transition-transform cursor-pointer">🔥</button>
+                    <button type="button" onclick="sendQuickReaction('👏')" class="hover:scale-125 transition-transform cursor-pointer">👏</button>
                 </div>
                 <div class="text-xs font-bold text-slate-400 pb-2 border-b border-slate-800 flex justify-between items-center">
                     <span>Message Options</span>
@@ -76,6 +76,15 @@
                     <!-- Populated dynamically -->
                 </div>
             </div>
+        </div>
+
+        <!-- Edit Staging Preview Bar -->
+        <div id="edit-preview-bar" class="hidden px-3 py-2 bg-slate-950 border-t border-slate-800 items-center justify-between z-20 flex-shrink-0">
+            <div class="flex flex-col border-l-2 border-blue-500 pl-2.5 overflow-hidden">
+                <span class="text-[10px] font-bold text-blue-400 truncate">Editing Message</span>
+                <span id="edit-preview-text" class="text-xs text-slate-300 truncate"></span>
+            </div>
+            <button type="button" onclick="cancelEdit()" class="text-slate-400 hover:text-white text-sm cursor-pointer p-1">&times;</button>
         </div>
 
         <!-- Reply Staging Preview Bar -->
@@ -239,6 +248,7 @@
         let recordingSeconds = 0;
         let activeReplyMessage = null;
         let activeSelectedMessage = null;
+        let activeEditMessage = null;
 
         // Realtime channels & typing indicators
         let groupChannel = null;
@@ -648,6 +658,7 @@
         // --- REPLY FEATURE ---
         function setReplyToMessage(msg) {
             activeReplyMessage = msg;
+            cancelEdit(); // Cancel edit if active
             const previewBar = document.getElementById('reply-preview-bar');
             const senderEl = document.getElementById('reply-preview-sender');
             const textEl = document.getElementById('reply-preview-text');
@@ -665,6 +676,30 @@
             const previewBar = document.getElementById('reply-preview-bar');
             previewBar.classList.remove('flex');
             previewBar.classList.add('hidden');
+        }
+
+        // --- EDIT FEATURE ---
+        function setEditMessage(msg) {
+            activeEditMessage = msg;
+            cancelReply(); // Cancel reply if active
+            const previewBar = document.getElementById('edit-preview-bar');
+            const textEl = document.getElementById('edit-preview-text');
+            const input = document.getElementById('message-input');
+
+            textEl.textContent = msg.message;
+            input.value = msg.message;
+
+            previewBar.classList.remove('hidden');
+            previewBar.classList.add('flex');
+            input.focus();
+        }
+
+        function cancelEdit() {
+            activeEditMessage = null;
+            const previewBar = document.getElementById('edit-preview-bar');
+            previewBar.classList.remove('flex');
+            previewBar.classList.add('hidden');
+            document.getElementById('message-input').value = '';
         }
 
         // --- VOICE NOTE RECORDING ---
@@ -785,7 +820,35 @@
             if (!content) return;
 
             input.value = '';
+
+            if (activeEditMessage) {
+                await updateGroupMessageInSupabase(activeEditMessage.id, content);
+                cancelEdit();
+                return;
+            }
+
             await sendGroupPayloadToSupabase(content, 'text');
+        }
+
+        async function updateGroupMessageInSupabase(msgId, newContent) {
+            if (!dbClient) return;
+
+            const { error } = await dbClient
+                .from('group_messages')
+                .update({ message: newContent, is_edited: true })
+                .eq('id', msgId);
+
+            if (!error) {
+                const index = messagesCache.findIndex(m => m.id === msgId);
+                if (index !== -1) {
+                    messagesCache[index].message = newContent;
+                    messagesCache[index].is_edited = true;
+                    saveLocalGroupCache(messagesCache);
+                    renderMessages(messagesCache);
+                }
+            } else {
+                alert('Failed to update message: ' + error.message);
+            }
         }
 
         async function sendGroupPayloadToSupabase(content, type) {
@@ -1084,6 +1147,13 @@
             timeSpan.textContent = timeString;
             metaRow.appendChild(timeSpan);
 
+            if (msg.is_edited && type === 'text') {
+                const editedSpan = document.createElement('span');
+                editedSpan.textContent = '(edited)';
+                editedSpan.className = 'italic text-slate-400';
+                metaRow.appendChild(editedSpan);
+            }
+
             if (isMe) {
                 const tickSpan = document.createElement('span');
                 tickSpan.className = 'font-bold text-xs ';
@@ -1126,8 +1196,9 @@
             
             const msgTime = new Date(msg.created_at).getTime();
             const now = new Date().getTime();
-            const diffHours = (now - msgTime) / (1000 * 60 * 60);
-            const within3Hours = diffHours <= 3;
+            const diffMinutes = (now - msgTime) / (1000 * 60);
+            const within30Minutes = diffMinutes <= 30;
+            const within3Hours = diffMinutes <= (3 * 60);
 
             const replyBtn = document.createElement('button');
             replyBtn.className = 'w-full text-left px-3 py-2 text-xs font-medium text-slate-200 hover:bg-slate-800 rounded-xl transition-all cursor-pointer';
@@ -1137,6 +1208,17 @@
                 setReplyToMessage(msg);
             };
             actionsContainer.appendChild(replyBtn);
+
+            if (isSender && within30Minutes && (!msg.media_type || msg.media_type === 'text')) {
+                const editBtn = document.createElement('button');
+                editBtn.className = 'w-full text-left px-3 py-2 text-xs font-medium text-blue-400 hover:bg-slate-800 rounded-xl transition-all cursor-pointer';
+                editBtn.textContent = '✏️ Edit Message';
+                editBtn.onclick = () => {
+                    closeMessageOptions();
+                    setEditMessage(msg);
+                };
+                actionsContainer.appendChild(editBtn);
+            }
 
             const copyBtn = document.createElement('button');
             copyBtn.className = 'w-full text-left px-3 py-2 text-xs font-medium text-slate-200 hover:bg-slate-800 rounded-xl transition-all cursor-pointer';
