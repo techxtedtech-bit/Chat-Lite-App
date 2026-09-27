@@ -84,6 +84,15 @@
                     <span>Message Options</span>
                     <button onclick="closeMessageOptions()" class="text-slate-400 hover:text-white text-base cursor-pointer">&times;</button>
                 </div>
+                <!-- Quick Emoji Reactions Tray -->
+                <div id="reaction-tray" class="flex items-center justify-between px-2 py-1.5 bg-slate-950 rounded-xl border border-slate-800 text-base">
+                    <button type="button" onclick="addReactionToMessage('❤️')" class="hover:scale-125 transition-transform cursor-pointer">❤️</button>
+                    <button type="button" onclick="addReactionToMessage('👍')" class="hover:scale-125 transition-transform cursor-pointer">👍</button>
+                    <button type="button" onclick="addReactionToMessage('😂')" class="hover:scale-125 transition-transform cursor-pointer">😂</button>
+                    <button type="button" onclick="addReactionToMessage('🔥')" class="hover:scale-125 transition-transform cursor-pointer">🔥</button>
+                    <button type="button" onclick="addReactionToMessage('😮')" class="hover:scale-125 transition-transform cursor-pointer">😮</button>
+                    <button type="button" onclick="addReactionToMessage('🙏')" class="hover:scale-125 transition-transform cursor-pointer">🙏</button>
+                </div>
                 <div id="message-options-actions" class="flex flex-col gap-1.5"></div>
             </div>
         </div>
@@ -136,6 +145,15 @@
                 <span class="text-xs text-slate-300 truncate" id="reply-target-content">Message content...</span>
             </div>
             <button type="button" onclick="cancelReply()" class="text-slate-400 hover:text-white text-base px-2 cursor-pointer">&times;</button>
+        </div>
+
+        <!-- Edit Message Staging Bar -->
+        <div id="edit-preview-bar" class="hidden p-2.5 bg-slate-900 border-t border-slate-800 items-center justify-between z-20 flex-shrink-0">
+            <div class="flex flex-col border-l-2 border-amber-500 pl-2 overflow-hidden">
+                <span class="text-[10px] font-bold text-amber-400">Editing Message</span>
+                <span class="text-xs text-slate-300 truncate" id="edit-target-content">Original text...</span>
+            </div>
+            <button type="button" onclick="cancelEdit()" class="text-slate-400 hover:text-white text-base px-2 cursor-pointer">&times;</button>
         </div>
 
         <!-- Media Preview Staging Bar -->
@@ -234,6 +252,8 @@
         let recordingTimerInterval = null;
         let recordingSeconds = 0;
         let replyingToMessage = null;
+        let editingMessage = null;
+        let activeSelectedMessageForOptions = null;
         let fetchedTargetProfile = null;
 
         let isMultiSelectMode = false;
@@ -262,78 +282,6 @@
                 modal.classList.remove('flex');
                 modal.classList.add('hidden');
                 if (onOk) onOk();
-            };
-        }
-
-        function showCustomConfirm(title, message, onConfirm, onCancel = null) {
-            const modal = document.getElementById('custom-app-modal');
-            document.getElementById('custom-modal-title').textContent = title;
-            document.getElementById('custom-modal-message').textContent = message;
-            
-            const actions = document.getElementById('custom-modal-actions');
-            actions.innerHTML = `
-                <button type="button" id="custom-modal-cancel-btn" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs rounded-xl cursor-pointer transition-all">Cancel</button>
-                <button type="button" id="custom-modal-confirm-btn" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl cursor-pointer transition-all">Confirm</button>
-            `;
-            
-            modal.classList.remove('hidden');
-            modal.classList.add('flex');
-
-            document.getElementById('custom-modal-cancel-btn').onclick = () => {
-                modal.classList.remove('flex');
-                modal.classList.add('hidden');
-                if (onCancel) onCancel();
-            };
-
-            document.getElementById('custom-modal-confirm-btn').onclick = () => {
-                modal.classList.remove('flex');
-                modal.classList.add('hidden');
-                if (onConfirm) onConfirm();
-            };
-        }
-
-        function showProfileAlert(title, message, onOk = null) {
-            const scopedModal = document.getElementById('profile-scoped-modal');
-            document.getElementById('profile-modal-alert-title').textContent = title;
-            document.getElementById('profile-modal-alert-message').textContent = message;
-            
-            const actions = document.getElementById('profile-modal-alert-actions');
-            actions.innerHTML = `<button type="button" id="profile-modal-ok-btn" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl cursor-pointer transition-all">OK</button>`;
-            
-            scopedModal.classList.remove('hidden');
-            scopedModal.classList.add('flex');
-
-            document.getElementById('profile-modal-ok-btn').onclick = () => {
-                scopedModal.classList.remove('flex');
-                scopedModal.classList.add('hidden');
-                if (onOk) onOk();
-            };
-        }
-
-        function showProfileConfirm(title, message, onConfirm, onCancel = null) {
-            const scopedModal = document.getElementById('profile-scoped-modal');
-            document.getElementById('profile-modal-alert-title').textContent = title;
-            document.getElementById('profile-modal-alert-message').textContent = message;
-            
-            const actions = document.getElementById('profile-modal-alert-actions');
-            actions.innerHTML = `
-                <button type="button" id="profile-modal-cancel-btn" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs rounded-xl cursor-pointer transition-all">Cancel</button>
-                <button type="button" id="profile-modal-confirm-btn" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl cursor-pointer transition-all">Confirm</button>
-            `;
-            
-            scopedModal.classList.remove('hidden');
-            scopedModal.classList.add('flex');
-
-            document.getElementById('profile-modal-cancel-btn').onclick = () => {
-                scopedModal.classList.remove('flex');
-                scopedModal.classList.add('hidden');
-                if (onCancel) onCancel();
-            };
-
-            document.getElementById('profile-modal-confirm-btn').onclick = () => {
-                scopedModal.classList.remove('flex');
-                scopedModal.classList.add('hidden');
-                if (onConfirm) onConfirm();
             };
         }
 
@@ -418,31 +366,27 @@
 
         function closeUserProfileModal() {
             document.getElementById('user-profile-modal').classList.add('hidden');
-            document.getElementById('profile-scoped-modal').classList.remove('flex');
-            document.getElementById('profile-scoped-modal').classList.add('hidden');
         }
 
         function copyChatCode() {
             const codeText = document.getElementById('profile-modal-chatcode').textContent;
             if (codeText && codeText !== '--' && codeText !== 'N/A') {
                 navigator.clipboard.writeText(codeText);
-                showProfileAlert('Copied', 'Unique chat code copied to clipboard!');
+                showCustomAlert('Copied', 'Unique chat code copied to clipboard!');
             }
         }
 
         function blockActiveUser() {
-            showProfileConfirm('Block User', `Are you sure you want to block @${targetUsername}?`, async () => {
-                let blockedList = [];
-                try {
-                    blockedList = JSON.parse(localStorage.getItem(`chatlite_blocked_${currentUser.username}`) || '[]');
-                } catch(e) {}
-                if (!blockedList.includes(targetUsername)) {
-                    blockedList.push(targetUsername);
-                    localStorage.setItem(`chatlite_blocked_${currentUser.username}`, JSON.stringify(blockedList));
-                }
-                showProfileAlert('Blocked', `Successfully blocked @${targetUsername}.`, () => {
-                    window.location.href = 'chatlist.html';
-                });
+            let blockedList = [];
+            try {
+                blockedList = JSON.parse(localStorage.getItem(`chatlite_blocked_${currentUser.username}`) || '[]');
+            } catch(e) {}
+            if (!blockedList.includes(targetUsername)) {
+                blockedList.push(targetUsername);
+                localStorage.setItem(`chatlite_blocked_${currentUser.username}`, JSON.stringify(blockedList));
+            }
+            showCustomAlert('Blocked', `Successfully blocked @${targetUsername}.`, () => {
+                window.location.href = 'chatlist.html';
             });
         }
 
@@ -559,7 +503,7 @@
             wrapper.addEventListener('contextmenu', (e) => e.preventDefault());
 
             let pressTimer = null;
-            const startPress = (e) => {
+            const startPress = () => {
                 if (msg.is_offline_pending) return; 
                 pressTimer = setTimeout(() => {
                     if (isMultiSelectMode) {
@@ -595,7 +539,7 @@
                 }
             }, {passive: true});
 
-            wrapper.addEventListener('touchend', (e) => {
+            wrapper.addEventListener('touchend', () => {
                 if (!isSwiping) return;
                 isSwiping = false;
                 const diff = touchCurrentX - touchStartX;
@@ -613,12 +557,7 @@
             });
 
             const bubble = document.createElement('div');
-            
-            if (msg.message_type === 'audio') {
-                bubble.className = `flex-1 px-3 py-2.5 rounded-2xl text-sm ${isMe ? 'bg-orange-600/90 text-white rounded-br-none shadow-lg' : 'bg-slate-800/80 text-slate-100 rounded-bl-none border border-white/10 backdrop-blur-md'}`;
-            } else {
-                bubble.className = `flex-1 px-3 py-2 rounded-2xl text-sm ${isMe ? 'bg-indigo-600 text-white rounded-br-none' : 'bg-slate-800 text-slate-100 rounded-bl-none border border-slate-700/50'}`;
-            }
+            bubble.className = `flex-1 px-3 py-2 rounded-2xl text-sm relative ${isMe ? 'bg-indigo-600 text-white rounded-br-none' : 'bg-slate-800 text-slate-100 rounded-bl-none border border-slate-700/50'}`;
 
             if (msg.reply_to) {
                 const replySnippet = document.createElement('div');
@@ -634,29 +573,34 @@
                 contentBody.innerHTML = `<img src="${msg.content}" class="rounded-xl max-h-60 w-full object-cover cursor-pointer" onclick="window.open('${msg.content}')">`;
             } else if (type === 'video') {
                 contentBody.innerHTML = `<video src="${msg.content}" controls class="rounded-xl max-h-60 w-full"></video>`;
-            } else if (type === 'audio') {
-                const audioId = `audio_elem_${Math.random().toString(36).substring(2, 9)}`;
-                contentBody.innerHTML = `
-                    <div class="flex flex-col gap-2 py-1 px-1 w-[240px]">
-                        <div class="flex items-center gap-2.5">
-                            <button type="button" onclick="toggleAudioPlayback('${audioId}', this)" class="w-8 h-8 rounded-full bg-white/30 hover:bg-white/40 text-white flex items-center justify-center text-xs font-bold shadow backdrop-blur-sm transition-transform cursor-pointer flex-shrink-0">▶</button>
-                            <span id="current_${audioId}" class="text-[11px] text-white/90 font-mono w-8">0:00</span>
-                            <div class="flex-1 flex flex-col justify-center overflow-hidden cursor-pointer" onclick="seekAudioBar(event, '${audioId}')">
-                                <div class="w-full bg-white/20 h-1.5 rounded-full overflow-hidden relative">
-                                    <div id="progress_${audioId}" class="bg-white h-full w-0 transition-all"></div>
-                                </div>
-                            </div>
-                            <button type="button" onclick="cycleAudioSpeed('${audioId}', this)" class="text-[10px] font-bold text-white px-2 py-1 bg-white/20 hover:bg-white/30 rounded-lg backdrop-blur-sm cursor-pointer w-8 text-center" id="speed_${audioId}">1x</button>
-                        </div>
-                        <audio id="${audioId}" src="${msg.content}" preload="metadata" onloadedmetadata="initAudioMetadata('${audioId}')" ontimeupdate="updateAudioProgress('${audioId}')" onended="resetAudioPlayer('${audioId}')" class="hidden"></audio>
-                    </div>
-                `;
             } else if (type === 'file') {
                 contentBody.innerHTML = `<a href="${msg.content}" target="_blank" download class="flex items-center gap-2 underline text-xs font-semibold py-1">📁 Download File Attachment</a>`;
             } else {
                 contentBody.textContent = msg.content;
             }
             bubble.appendChild(contentBody);
+
+            if (msg.is_edited) {
+                const editedTag = document.createElement('span');
+                editedTag.className = 'text-[9px] opacity-75 ml-1 italic';
+                editedTag.textContent = '(edited)';
+                contentBody.appendChild(editedTag);
+            }
+
+            // Render Reactions Badge if present
+            if (msg.reactions && Object.keys(msg.reactions).length > 0) {
+                const reactionBadge = document.createElement('div');
+                reactionBadge.className = `absolute -bottom-2.5 ${isMe ? 'right-2' : 'left-2'} bg-slate-900 border border-slate-700 rounded-full px-2 py-0.5 text-[11px] flex items-center gap-1 shadow`;
+                let reactionHtml = '';
+                for (const [emoji, users] of Object.entries(msg.reactions)) {
+                    if (users && users.length > 0) {
+                        reactionHtml += `<span>${emoji} ${users.length > 1 ? users.length : ''}</span>`;
+                    }
+                }
+                reactionBadge.innerHTML = reactionHtml;
+                if (reactionHtml) bubble.appendChild(reactionBadge);
+            }
+
             rowFlex.appendChild(bubble);
 
             const metaRow = document.createElement('div');
@@ -685,76 +629,7 @@
             if (scrollToBottom) container.scrollTop = container.scrollHeight;
         }
 
-        function initAudioMetadata(audioId) {
-            const audio = document.getElementById(audioId);
-            const durationEl = document.getElementById(`duration_${audioId}`);
-            if (audio && durationEl && !isNaN(audio.duration)) {
-                const mins = Math.floor(audio.duration / 60);
-                const secs = Math.floor(audio.duration % 60);
-                durationEl.textContent = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
-            }
-        }
-
-        function toggleAudioPlayback(audioId, btnEl) {
-            const audio = document.getElementById(audioId);
-            if (!audio) return;
-            if (audio.paused) {
-                audio.play();
-                btnEl.textContent = '⏸';
-            } else {
-                audio.pause();
-                btnEl.textContent = '▶';
-            }
-        }
-
-        function updateAudioProgress(audioId) {
-            const audio = document.getElementById(audioId);
-            const currentEl = document.getElementById(`current_${audioId}`);
-            const progressBar = document.getElementById(`progress_${audioId}`);
-            if (audio && currentEl && progressBar && !isNaN(audio.duration)) {
-                const mins = Math.floor(audio.currentTime / 60);
-                const secs = Math.floor(audio.currentTime % 60);
-                currentEl.textContent = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
-                const percent = (audio.currentTime / audio.duration) * 100;
-                progressBar.style.width = `${percent}%`;
-            }
-        }
-
-        function resetAudioPlayer(audioId) {
-            const audio = document.getElementById(audioId);
-            const currentEl = document.getElementById(`current_${audioId}`);
-            const progressBar = document.getElementById(`progress_${audioId}`);
-            const playBtn = audio.parentElement.querySelector('button');
-            if (audio && currentEl && progressBar) {
-                currentEl.textContent = '0:00';
-                progressBar.style.width = '0%';
-                if (playBtn) playBtn.textContent = '▶';
-            }
-        }
-
-        function seekAudioBar(event, audioId) {
-            const audio = document.getElementById(audioId);
-            if (!audio || isNaN(audio.duration)) return;
-            const rect = event.currentTarget.getBoundingClientRect();
-            const clickX = event.clientX - rect.left;
-            const width = rect.width;
-            const percent = clickX / width;
-            audio.currentTime = percent * audio.duration;
-        }
-
-        function cycleAudioSpeed(audioId, btnEl) {
-            const audio = document.getElementById(audioId);
-            if (!audio) return;
-            let speeds = [1, 1.25, 1.5, 2];
-            let currentRate = audio.playbackRate;
-            let nextIndex = (speeds.indexOf(currentRate) + 1) % speeds.length;
-            if (nextIndex < 0) nextIndex = 0;
-            let newRate = speeds[nextIndex];
-            audio.playbackRate = newRate;
-            btnEl.textContent = `${newRate}x`;
-        }
-
-        // --- SCOPED REAL-TIME INSTANT MESSAGE LISTENER ---
+        // --- REAL-TIME INSTANT MESSAGE LISTENER ---
         function handleTypingInput() {
             if (!navigator.onLine) return;
             supabaseClient.channel(`typing_${currentUser.username}_${targetUsername}`).send({
@@ -768,7 +643,6 @@
             if (messageSubscription) supabaseClient.removeChannel(messageSubscription);
             if (typingSubscription) supabaseClient.removeChannel(typingSubscription);
 
-            // Scoped Real-Time Message Insert Listener for the active conversation
             messageSubscription = supabaseClient
                 .channel(`room_${currentUser.username}_${targetUsername}`)
                 .on(
@@ -802,7 +676,6 @@
                 )
                 .subscribe();
 
-            // Typing Indicator Broadcast
             typingSubscription = supabaseClient
                 .channel(`typing_${targetUsername}_${currentUser.username}`)
                 .on('broadcast', { event: 'typing' }, payload => {
@@ -858,94 +731,8 @@
             saveOfflineQueue(remainingQueue);
         }
 
-        function enterMultiSelectMode(msg) {
-            isMultiSelectMode = true;
-            selectedMessageIds.clear();
-            if (msg && msg.id) selectedMessageIds.add(msg.id);
-            document.getElementById('multi-select-bar').classList.remove('hidden');
-            document.getElementById('multi-select-bar').classList.add('flex');
-            renderMessages(messagesCache);
-        }
-
-        function exitMultiSelectMode() {
-            isMultiSelectMode = false;
-            selectedMessageIds.clear();
-            document.getElementById('multi-select-bar').classList.remove('flex');
-            document.getElementById('multi-select-bar').classList.add('hidden');
-            renderMessages(messagesCache);
-        }
-
-        function toggleMessageSelection(msgId) {
-            if (selectedMessageIds.has(msgId)) selectedMessageIds.delete(msgId);
-            else selectedMessageIds.add(msgId);
-            if (selectedMessageIds.size === 0) { exitMultiSelectMode(); return; }
-            document.getElementById('selected-count-text').textContent = `${selectedMessageIds.size} selected`;
-            renderMessages(messagesCache);
-        }
-
-        function deleteSelectedMessages() {
-            if (selectedMessageIds.size === 0) return;
-            let hiddenForMe = [];
-            try { hiddenForMe = JSON.parse(localStorage.getItem(`chatlite_deleted_for_me_${currentUser.username}_${targetUsername}`) || '[]'); } catch(e) {}
-            
-            const idsToDelete = Array.from(selectedMessageIds);
-            idsToDelete.forEach(id => { if (!hiddenForMe.includes(id)) hiddenForMe.push(id); });
-            localStorage.setItem(`chatlite_deleted_for_me_${currentUser.username}_${targetUsername}`, JSON.stringify(hiddenForMe));
-            
-            exitMultiSelectMode();
-            renderMessages(messagesCache);
-            showUndoBanner(idsToDelete);
-        }
-
-        function showUndoBanner(msgIds) {
-            if (pendingDeleteTimer) clearTimeout(pendingDeleteTimer);
-            if (undoCountdownInterval) clearInterval(undoCountdownInterval);
-
-            undoTargetMessage = msgIds;
-            const banner = document.getElementById('undo-banner');
-            const countdownEl = document.getElementById('undo-countdown');
-            let timeLeft = 10;
-            countdownEl.textContent = timeLeft;
-
-            banner.classList.remove('hidden');
-            banner.classList.add('flex');
-
-            undoCountdownInterval = setInterval(() => {
-                timeLeft--;
-                countdownEl.textContent = timeLeft;
-                if (timeLeft <= 0) {
-                    clearInterval(undoCountdownInterval);
-                }
-            }, 1000);
-
-            pendingDeleteTimer = setTimeout(() => {
-                hideUndoBanner();
-                undoTargetMessage = null;
-            }, 10000);
-        }
-
-        function hideUndoBanner() {
-            const banner = document.getElementById('undo-banner');
-            banner.classList.remove('flex');
-            banner.classList.add('hidden');
-            if (pendingDeleteTimer) clearTimeout(pendingDeleteTimer);
-            if (undoCountdownInterval) clearInterval(undoCountdownInterval);
-        }
-
-        function triggerUndoAction() {
-            if (!undoTargetMessage) return;
-            let hiddenForMe = [];
-            try { hiddenForMe = JSON.parse(localStorage.getItem(`chatlite_deleted_for_me_${currentUser.username}_${targetUsername}`) || '[]'); } catch(e) {}
-            
-            hiddenForMe = hiddenForMe.filter(id => !undoTargetMessage.includes(id));
-            localStorage.setItem(`chatlite_deleted_for_me_${currentUser.username}_${targetUsername}`, JSON.stringify(hiddenForMe));
-
-            hideUndoBanner();
-            renderMessages(messagesCache);
-            undoTargetMessage = null;
-        }
-
         function openMessageOptions(msg) {
+            activeSelectedMessageForOptions = msg;
             const modal = document.getElementById('message-options-modal');
             const actionsContainer = document.getElementById('message-options-actions');
             actionsContainer.innerHTML = '';
@@ -955,6 +742,14 @@
             replyBtn.textContent = '↩️ Reply';
             replyBtn.onclick = () => { closeMessageOptions(); setReplyTarget(msg); };
             actionsContainer.appendChild(replyBtn);
+
+            if (msg.sender_username === currentUser.username && (msg.message_type === 'text' || !msg.message_type)) {
+                const editBtn = document.createElement('button');
+                editBtn.className = 'w-full text-left px-3 py-2 text-xs font-medium text-indigo-400 hover:bg-slate-800 rounded-xl cursor-pointer';
+                editBtn.textContent = '✏️ Edit Message';
+                editBtn.onclick = () => { closeMessageOptions(); setEditTarget(msg); };
+                actionsContainer.appendChild(editBtn);
+            }
 
             if (msg.message_type === 'text' || !msg.message_type) {
                 const copyBtn = document.createElement('button');
@@ -968,16 +763,6 @@
                 actionsContainer.appendChild(copyBtn);
             }
 
-            const forwardBtn = document.createElement('button');
-            forwardBtn.className = 'w-full text-left px-3 py-2 text-xs font-medium text-slate-200 hover:bg-slate-800 rounded-xl cursor-pointer';
-            forwardBtn.textContent = '↗️ Forward';
-            forwardBtn.onclick = () => {
-                closeMessageOptions();
-                document.getElementById('message-input').value = msg.content;
-                document.getElementById('message-input').focus();
-            };
-            actionsContainer.appendChild(forwardBtn);
-
             const deleteForMeBtn = document.createElement('button');
             deleteForMeBtn.className = 'w-full text-left px-3 py-2 text-xs font-medium text-slate-200 hover:bg-slate-800 rounded-xl cursor-pointer';
             deleteForMeBtn.textContent = '🗑️ Delete for me';
@@ -988,32 +773,8 @@
                 hiddenForMe.push(msg.id);
                 localStorage.setItem(`chatlite_deleted_for_me_${currentUser.username}_${targetUsername}`, JSON.stringify(hiddenForMe));
                 renderMessages(messagesCache);
-                showUndoBanner([msg.id]);
             };
             actionsContainer.appendChild(deleteForMeBtn);
-
-            if (msg.sender_username === currentUser.username && msg.id) {
-                const deleteEveryoneBtn = document.createElement('button');
-                deleteEveryoneBtn.className = 'w-full text-left px-3 py-2 text-xs font-medium text-red-400 hover:bg-red-500/10 rounded-xl cursor-pointer';
-                deleteEveryoneBtn.textContent = '🚫 Delete for everyone';
-                deleteEveryoneBtn.onclick = async () => {
-                    closeMessageOptions();
-                    if (navigator.onLine) {
-                        const { error } = await supabaseClient
-                            .from('messages')
-                            .update({ is_deleted_for_everyone: true })
-                            .eq('id', msg.id);
-                        if (!error) {
-                            fetchMessages();
-                        } else {
-                            showCustomAlert('Error', 'Could not delete message for everyone.');
-                        }
-                    } else {
-                        showCustomAlert('Offline', 'Internet connection required to delete for everyone.');
-                    }
-                };
-                actionsContainer.appendChild(deleteEveryoneBtn);
-            }
 
             modal.classList.remove('hidden');
             modal.classList.add('flex');
@@ -1022,6 +783,56 @@
         function closeMessageOptions() {
             document.getElementById('message-options-modal').classList.remove('flex');
             document.getElementById('message-options-modal').classList.add('hidden');
+        }
+
+        // --- EMOJI REACTION HANDLER ---
+        async function addReactionToMessage(emoji) {
+            if (!activeSelectedMessageForOptions || !activeSelectedMessageForOptions.id) return;
+            const msg = activeSelectedMessageForOptions;
+            closeMessageOptions();
+
+            let reactions = msg.reactions || {};
+            if (!reactions[emoji]) reactions[emoji] = [];
+
+            if (!reactions[emoji].includes(currentUser.username)) {
+                reactions[emoji].push(currentUser.username);
+            } else {
+                reactions[emoji] = reactions[emoji].filter(u => u !== currentUser.username);
+                if (reactions[emoji].length === 0) delete reactions[emoji];
+            }
+
+            if (navigator.onLine) {
+                const { error } = await supabaseClient
+                    .from('messages')
+                    .update({ reactions: reactions })
+                    .eq('id', msg.id);
+
+                if (!error) {
+                    msg.reactions = reactions;
+                    saveLocalCache(messagesCache);
+                    renderMessages(messagesCache);
+                }
+            }
+        }
+
+        // --- MESSAGE EDIT HANDLERS ---
+        function setEditTarget(msg) {
+            editingMessage = msg;
+            const editBar = document.getElementById('edit-preview-bar');
+            document.getElementById('edit-target-content').textContent = msg.content;
+            editBar.classList.remove('hidden');
+            editBar.classList.add('flex');
+            
+            const input = document.getElementById('message-input');
+            input.value = msg.content;
+            input.focus();
+        }
+
+        function cancelEdit() {
+            editingMessage = null;
+            document.getElementById('edit-preview-bar').classList.remove('flex');
+            document.getElementById('edit-preview-bar').classList.add('hidden');
+            document.getElementById('message-input').value = '';
         }
 
         function setReplyTarget(msg) {
@@ -1051,6 +862,33 @@
             }
 
             if (!content) return;
+
+            // Handle Message Editing Submission
+            if (editingMessage && editingMessage.id) {
+                const msgId = editingMessage.id;
+                cancelEdit();
+                input.value = '';
+
+                if (navigator.onLine) {
+                    const { error } = await supabaseClient
+                        .from('messages')
+                        .update({ content: content, is_edited: true })
+                        .eq('id', msgId);
+
+                    if (!error) {
+                        const target = messagesCache.find(m => m.id === msgId);
+                        if (target) {
+                            target.content = content;
+                            target.is_edited = true;
+                            saveLocalCache(messagesCache);
+                            renderMessages(messagesCache);
+                        }
+                    } else {
+                        showCustomAlert('Error', 'Failed to update message.');
+                    }
+                }
+                return;
+            }
 
             input.value = '';
             let replyMeta = replyingToMessage ? { sender: replyingToMessage.sender_username === currentUser.username ? 'You' : targetName, content: replyingToMessage.content } : null;
@@ -1302,7 +1140,6 @@
         fetchMessages();
         subscribeToRealtimeChannels();
 
-        // Fallback periodic sync loop every 5 seconds to ensure drops even if webhooks fail
         setInterval(() => {
             fetchMessages();
         }, 5000);
