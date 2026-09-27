@@ -555,17 +555,10 @@
             
             if (type === 'image' || type === 'video' || msg.content.match(/\.(jpeg|jpg|gif|png|webp|webm|mp4)$/i)) {
                 const isVideo = type === 'video' || msg.content.match(/\.(webm|mp4)$/i);
-                const mediaId = `media_node_${Math.random().toString(36).substring(2, 9)}`;
                 
                 contentBody.innerHTML = `
-                    <div id="${mediaId}" class="relative rounded-xl overflow-hidden bg-slate-950 flex flex-col items-center justify-center max-h-60 w-full min-h-[140px] border border-slate-800">
-                        <div class="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/80 backdrop-blur-xs p-3 z-10 download-overlay">
-                            <span class="text-xs text-slate-300 font-medium mb-2 text-center truncate w-full">${isVideo ? '📹 Video Attachment' : '🖼️ Image Attachment'}</span>
-                            <button type="button" onclick="downloadAndRenderMedia('${msg.content}', '${isVideo ? 'video' : 'image'}', '${mediaId}')" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-lg flex items-center gap-2 cursor-pointer transition-transform hover:scale-105">
-                                ⬇️ Download to View
-                            </button>
-                        </div>
-                        <div class="media-container w-full h-full flex items-center justify-center"></div>
+                    <div class="relative rounded-xl overflow-hidden bg-slate-950 flex flex-col items-center justify-center max-h-60 w-full min-h-[140px] border border-slate-800">
+                        ${isVideo ? `<video src="${msg.content}" controls class="rounded-xl max-h-60 w-full object-cover"></video>` : `<img src="${msg.content}" class="rounded-xl max-h-60 w-full object-cover cursor-pointer" onclick="window.open('${msg.content}')">`}
                     </div>
                 `;
             } else if (type === 'audio' || msg.content.includes('voice_note_') || msg.content.endsWith('.webm')) {
@@ -629,21 +622,6 @@
             wrapper.appendChild(rowFlex);
             wrapper.appendChild(metaRow);
             container.appendChild(wrapper);
-        }
-
-        function downloadAndRenderMedia(url, mediaType, containerId) {
-            const wrapper = document.getElementById(containerId);
-            if (!wrapper) return;
-
-            const overlay = wrapper.querySelector('.download-overlay');
-            const targetContainer = wrapper.querySelector('.media-container');
-            if (overlay) overlay.remove();
-
-            if (mediaType === 'video') {
-                targetContainer.innerHTML = `<video src="${url}" controls class="rounded-xl max-h-60 w-full object-cover"></video>`;
-            } else {
-                targetContainer.innerHTML = `<img src="${url}" class="rounded-xl max-h-60 w-full object-cover cursor-pointer" onclick="window.open('${url}')">`;
-            }
         }
 
         function handleTypingInput() {
@@ -814,7 +792,6 @@
             document.getElementById('message-options-modal').classList.add('hidden');
         }
 
-        // --- AUTHORIZED FORWARD FEATURE ---
         function forwardMessage(msg) {
             const forwardData = {
                 content: msg.content,
@@ -824,7 +801,6 @@
             window.location.href = 'chatlist.html?forward=true';
         }
 
-        // --- DELETE FOR ME WITH 10s UNDO FEATURE ---
         function triggerDeleteForMeWithUndo(msg) {
             undoTargetMessage = msg;
             undoSecondsLeft = 10;
@@ -861,7 +837,6 @@
             }, 10000);
         }
 
-        // --- DELETE FOR EVERYONE & 10s UNDO FEATURE ---
         async function triggerDeleteForEveryoneWithUndo(msg) {
             undoTargetMessage = msg;
             undoSecondsLeft = 10;
@@ -928,7 +903,6 @@
             banner.classList.add('hidden');
         }
 
-        // --- EMOJI REACTION HANDLER ---
         async function addReactionToMessage(emoji) {
             if (!activeSelectedMessageForOptions || !activeSelectedMessageForOptions.id) return;
             
