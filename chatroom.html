@@ -189,15 +189,21 @@
                 <div class="flex items-center gap-2">
                     <span class="w-3 h-3 rounded-full bg-red-500 animate-pulse flex-shrink-0"></span>
                     <span id="recording-timer" class="text-xs font-semibold text-red-400">0:00</span>
+                    <span id="lock-status-badge" class="hidden text-[10px] px-1.5 py-0.5 bg-red-500/20 text-red-300 rounded font-bold uppercase tracking-wider">🔒 Locked</span>
                 </div>
                 <div class="flex items-center gap-1">
-                    <button type="button" id="pause-rec-btn" onclick="togglePauseRecording()" class="text-[11px] text-slate-300 hover:text-white px-2 py-1 bg-slate-800 rounded-lg cursor-pointer">⏸ Pause</button>
-                    <button type="button" onclick="stopRecordingOnly()" class="text-[11px] text-white px-2 py-1 bg-red-600 hover:bg-red-500 rounded-lg cursor-pointer font-bold">⏹ Stop</button>
                     <button type="button" onclick="cancelRecording()" class="text-[11px] text-slate-400 hover:text-white px-2 py-1 bg-slate-800 rounded-lg cursor-pointer">Discard</button>
+                    <button type="button" onclick="stopRecordingAndSend()" class="text-[11px] text-white px-2 py-1 bg-red-600 hover:bg-red-500 rounded-lg cursor-pointer font-bold">Send 🎤</button>
                 </div>
             </div>
 
-            <button type="button" id="mic-btn" onclick="startVoiceRecording()" class="p-2 text-slate-400 hover:text-red-400 transition-colors cursor-pointer flex-shrink-0" title="Record Voice Note">🎤</button>
+            <div id="mic-container" class="relative flex items-center flex-shrink-0">
+                <div id="slide-cancel-hint" class="absolute right-12 whitespace-nowrap bg-slate-800/90 text-slate-300 text-[11px] px-2.5 py-1 rounded-full shadow-lg border border-slate-700 pointer-events-none hidden transition-opacity">
+                    &larr; Slide to cancel &nbsp;|&nbsp; 🔒 Swipe up to lock
+                </div>
+                <button type="button" id="mic-btn" class="p-2 text-slate-400 hover:text-red-400 transition-colors cursor-pointer flex-shrink-0 select-none" title="Hold to Record Voice Note">🎤</button>
+            </div>
+
             <button type="submit" id="send-btn" class="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 font-semibold rounded-xl text-sm transition-all cursor-pointer text-white flex-shrink-0">Send</button>
         </form>
     </div>
@@ -236,13 +242,19 @@
         let recordedFileStaged = null;
         let stagedPayload = null; 
         let isRecording = false;
-        let isPaused = false;
+        let isLockedRecording = false;
         let recordingTimerInterval = null;
         let recordingSeconds = 0;
-        let replyingToMessage = null;
+        let replyTarget = null;
         let editingMessage = null;
         let activeSelectedMessageForOptions = null;
         let fetchedTargetProfile = null;
+
+        // Slide & Lock Interaction State Variables
+        let micStartX = 0;
+        let micStartY = 0;
+        let currentTouchX = 0;
+        let currentTouchY = 0;
 
         let isMultiSelectMode = false;
         let selectedMessageIds = new Set();
@@ -790,6 +802,156 @@
             audioElement.currentTime = clickRatio * audioElement.duration;
         }
 
+        // WhatsApp-Style Slide-to-Cancel & Lock Mic Gesture Listeners Setup
+        const micBtnEl = document.getElementById('mic-btn');
+        if (micBtnEl) {
+            micBtnEl.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                micStartX = e.touches[0].clientX;
+                micStartY = e.touches[0].clientY;
+                currentTouchX = micStartX;
+                currentTouchY = micStartY;
+                startVoiceRecording();
+            }, { passive: false });
+
+            micBtnEl.addEventListener('touchmove', (e) => {
+                if (!isRecording || isLockedRecording) return;
+                currentTouchX = e.touches[0].clientX;
+                currentTouchY = e.touches[0].clientY;
+                const diffX = micStartX - currentTouchX; // Positive when sliding left
+                const diffY = micStartY - currentTouchY; // Positive when sliding up
+
+                const hint = document.getElementById('slide-cancel-hint');
+                if (diffX > 20) {
+                    hint.classList.remove('hidden');
+                    hint.style.transform = `translateX(-${Math.min(diffX, 100)}px)`;
+                }
+
+                // Slide to cancel threshold
+                if (diffX > 120) {
+                    cancelRecording();
+                    hint.classList.add('hidden');
+                    hint.style.transform = 'translateX(0px)';
+                    return;
+                }
+
+                // Swipe up to lock threshold
+                if (diffY > 75) {
+                    isLockedRecording = true;
+                    hint.classList.add('hidden');
+                    hint.style.transform = 'translateX(0px)';
+                    document.getElementById('lock-status-badge').classList.remove('hidden');
+                }
+            }, { passive: true });
+
+            micBtnEl.addEventListener('touchend', (e) => {
+                if (!isRecording) return;
+                const hint = document.getElementById('slide-cancel-hint');
+                hint.classList.add('hidden');
+                hint.style.transform = 'translateX(0px)';
+
+                // If not locked, releasing finger stops and sends immediately
+                if (!isLockedRecording) {
+                    stopRecordingAndSend();
+                }
+            });
+
+            // Desktop Mouse Support for Hold-to-Record
+            micBtnEl.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+                startVoiceRecording();
+            });
+
+            window.addEventListener('mouseup', (e) => {
+                if (isRecording && !isLockedRecording) {
+                    stopRecordingAndSend();
+                }
+            });
+        }
+
+        async function startVoiceRecording() {
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                showCustomAlert("Not Supported", "Audio recording is not supported on this browser.");
+                return;
+            }
+
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+                audioChunks = [];
+
+                mediaRecorder.ondataavailable = (event) => {
+                    if (event.data.size > 0) audioChunks.push(event.data);
+                };
+
+                mediaRecorder.onstop = async () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    recordedFileStaged = new File([audioBlob], `voice_note_${Date.now()}.webm`, { type: 'audio/webm' });
+                    await uploadStagedMediaAndSend();
+                };
+
+                mediaRecorder.start();
+                isRecording = true;
+                isLockedRecording = false;
+                recordingSeconds = 0;
+
+                document.getElementById('message-input').classList.add('hidden');
+                document.getElementById('message-input').classList.remove('flex');
+                document.getElementById('mic-btn').classList.add('hidden');
+                document.getElementById('attach-btn').classList.add('hidden');
+                document.getElementById('recording-ui').classList.remove('hidden');
+                document.getElementById('recording-ui').classList.add('flex');
+                document.getElementById('lock-status-badge').classList.add('hidden');
+                document.getElementById('slide-cancel-hint').classList.remove('hidden');
+
+                recordingTimerInterval = setInterval(() => {
+                    recordingSeconds++;
+                    const mins = Math.floor(recordingSeconds / 60);
+                    const secs = recordingSeconds % 60;
+                    document.getElementById('recording-timer').textContent = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+                }, 1000);
+
+            } catch (err) {
+                showCustomAlert("Microphone Error", "Could not access microphone permissions.");
+            }
+        }
+
+        function stopRecordingAndSend() {
+            if (mediaRecorder && isRecording) {
+                mediaRecorder.stop();
+                mediaRecorder.stream.getTracks().forEach(track => track.stop());
+                clearInterval(recordingTimerInterval);
+                isRecording = false;
+                isLockedRecording = false;
+
+                document.getElementById('recording-ui').classList.remove('flex');
+                document.getElementById('recording-ui').classList.add('hidden');
+                document.getElementById('message-input').classList.remove('hidden');
+                document.getElementById('message-input').classList.add('flex');
+                document.getElementById('mic-btn').classList.remove('hidden');
+                document.getElementById('attach-btn').classList.remove('hidden');
+                document.getElementById('slide-cancel-hint').classList.add('hidden');
+            }
+        }
+
+        function cancelRecording() {
+            if (mediaRecorder && isRecording) {
+                mediaRecorder.stop();
+                mediaRecorder.stream.getTracks().forEach(track => track.stop());
+                clearInterval(recordingTimerInterval);
+                isRecording = false;
+                isLockedRecording = false;
+            }
+            recordedFileStaged = null;
+            document.getElementById('recording-ui').classList.remove('flex');
+            document.getElementById('recording-ui').classList.add('hidden');
+            document.getElementById('message-input').classList.remove('hidden');
+            document.getElementById('message-input').classList.add('flex');
+            document.getElementById('mic-btn').classList.remove('hidden');
+            document.getElementById('attach-btn').classList.remove('hidden');
+            document.getElementById('slide-cancel-hint').classList.add('hidden');
+        }
+
         function handleTypingInput() {
             if (!navigator.onLine) return;
             supabaseClient.channel(`typing_${currentUser.username}_${targetUsername}`).send({
@@ -1128,7 +1290,7 @@
         }
 
         function setReplyTarget(msg) {
-            replyingToMessage = msg;
+            replyTarget = msg;
             const replyBar = document.getElementById('reply-preview-bar');
             document.getElementById('reply-target-sender').textContent = `Replying to ${msg.sender_username === currentUser.username ? 'You' : targetName}`;
             document.getElementById('reply-target-content').textContent = msg.content;
@@ -1138,7 +1300,7 @@
         }
 
         function cancelReply() {
-            replyingToMessage = null;
+            replyTarget = null;
             document.getElementById('reply-preview-bar').classList.remove('flex');
             document.getElementById('reply-preview-bar').classList.add('hidden');
         }
@@ -1182,7 +1344,7 @@
             }
 
             input.value = '';
-            let replyMeta = replyingToMessage ? { sender: replyingToMessage.sender_username === currentUser.username ? 'You' : targetName, content: replyingToMessage.content } : null;
+            let replyMeta = replyTarget ? { sender: replyTarget.sender_username === currentUser.username ? 'You' : targetName, content: replyTarget.content } : null;
 
             const payload = {
                 sender_username: currentUser.username,
@@ -1244,11 +1406,6 @@
         async function uploadStagedMediaAndSend() {
             if (!recordedFileStaged) return;
             const file = recordedFileStaged;
-            const progressBar = document.getElementById('upload-progress-bar');
-            const statusText = document.getElementById('upload-status-text');
-
-            statusText.textContent = "Uploading media to storage...";
-            progressBar.style.width = '30%';
 
             const fileExt = file.name.split('.').pop() || 'bin';
             const fileName = `${Date.now()}_${Math.random().toString(36).substring(2)}.${fileExt}`;
@@ -1264,22 +1421,16 @@
                 .upload(filePath, file);
 
             if (uploadError) {
-                statusText.textContent = "Upload failed. Try again.";
                 showCustomAlert("Upload Error", uploadError.message);
                 return;
             }
-
-            progressBar.style.width = '70%';
-            statusText.textContent = "Finalizing secure link...";
 
             const { data: publicUrlData } = supabaseClient.storage
                 .from('chat-media')
                 .getPublicUrl(filePath);
 
             const publicUrl = publicUrlData.publicUrl;
-            progressBar.style.width = '100%';
-
-            let replyMeta = replyingToMessage ? { sender: replyingToMessage.sender_username === currentUser.username ? 'You' : targetName, content: replyingToMessage.content } : null;
+            let replyMeta = replyTarget ? { sender: replyTarget.sender_username === currentUser.username ? 'You' : targetName, content: replyTarget.content } : null;
 
             const payload = {
                 sender_username: currentUser.username,
@@ -1302,99 +1453,6 @@
 
             clearStagedMedia();
             cancelReply();
-        }
-
-        async function startVoiceRecording() {
-            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                showCustomAlert("Not Supported", "Audio recording is not supported on this browser.");
-                return;
-            }
-
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
-                audioChunks = [];
-
-                mediaRecorder.ondataavailable = (event) => {
-                    if (event.data.size > 0) audioChunks.push(event.data);
-                };
-
-                mediaRecorder.onstop = () => {
-                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-                    recordedFileStaged = new File([audioBlob], `voice_note_${Date.now()}.webm`, { type: 'audio/webm' });
-                    
-                    document.getElementById('media-preview-bar').classList.remove('hidden');
-                    document.getElementById('media-preview-bar').classList.add('flex');
-                    document.getElementById('preview-container').innerHTML = `<audio src="${URL.createObjectURL(audioBlob)}" controls preload="metadata" class="h-8 w-full"></audio>`;
-                    document.getElementById('upload-status-text').textContent = "Voice note ready. Tap Send to dispatch.";
-                };
-
-                mediaRecorder.start();
-                isRecording = true;
-                recordingSeconds = 0;
-
-                document.getElementById('message-input').classList.add('hidden');
-                document.getElementById('message-input').classList.remove('flex');
-                document.getElementById('mic-btn').classList.add('hidden');
-                document.getElementById('attach-btn').classList.add('hidden');
-                document.getElementById('recording-ui').classList.remove('hidden');
-                document.getElementById('recording-ui').classList.add('flex');
-
-                recordingTimerInterval = setInterval(() => {
-                    recordingSeconds++;
-                    const mins = Math.floor(recordingSeconds / 60);
-                    const secs = recordingSeconds % 60;
-                    document.getElementById('recording-timer').textContent = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
-                }, 1000);
-
-            } catch (err) {
-                showCustomAlert("Microphone Error", "Could not access microphone permissions.");
-            }
-        }
-
-        function stopRecordingOnly() {
-            if (mediaRecorder && isRecording) {
-                mediaRecorder.stop();
-                mediaRecorder.stream.getTracks().forEach(track => track.stop());
-                clearInterval(recordingTimerInterval);
-                isRecording = false;
-
-                document.getElementById('recording-ui').classList.remove('flex');
-                document.getElementById('recording-ui').classList.add('hidden');
-                document.getElementById('message-input').classList.remove('hidden');
-                document.getElementById('message-input').classList.add('flex');
-                document.getElementById('mic-btn').classList.remove('hidden');
-                document.getElementById('attach-btn').classList.remove('hidden');
-            }
-        }
-
-        function togglePauseRecording() {
-            if (!mediaRecorder) return;
-            if (isPaused) {
-                mediaRecorder.resume();
-                isPaused = false;
-                document.getElementById('pause-rec-btn').textContent = '⏸ Pause';
-            } else {
-                mediaRecorder.pause();
-                isPaused = true;
-                document.getElementById('pause-rec-btn').textContent = '▶ Resume';
-            }
-        }
-
-        function cancelRecording() {
-            if (mediaRecorder && isRecording) {
-                mediaRecorder.stop();
-                mediaRecorder.stream.getTracks().forEach(track => track.stop());
-                clearInterval(recordingTimerInterval);
-                isRecording = false;
-            }
-            clearStagedMedia();
-            document.getElementById('recording-ui').classList.remove('flex');
-            document.getElementById('recording-ui').classList.add('hidden');
-            document.getElementById('message-input').classList.remove('hidden');
-            document.getElementById('message-input').classList.add('flex');
-            document.getElementById('mic-btn').classList.remove('hidden');
-            document.getElementById('attach-btn').classList.remove('hidden');
         }
 
         function openMediaGallery(typeFilter) {
