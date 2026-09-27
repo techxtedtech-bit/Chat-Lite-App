@@ -10,7 +10,6 @@
 <body class="bg-slate-950 text-slate-100 h-[100dvh] flex flex-col font-sans overflow-hidden m-0">
 
     <div class="flex-1 flex flex-col w-full max-w-md mx-auto relative shadow-2xl bg-slate-900 border-x border-slate-800 h-full overflow-hidden">
-        <!-- Header (Fixed & Non-scrolling) -->
         <div class="p-3 border-b border-slate-800 flex items-center justify-between bg-slate-900 z-20 flex-shrink-0">
             <div class="flex items-center gap-2.5 overflow-hidden">
                 <button onclick="window.location.href='chatlist.html'" class="text-slate-400 hover:text-white text-sm cursor-pointer px-1">&larr;</button>
@@ -18,12 +17,10 @@
                     <div class="w-8 h-8 rounded-full bg-indigo-600/30 border border-indigo-500/30 flex items-center justify-center font-bold text-indigo-400 text-xs flex-shrink-0 overflow-hidden" id="active-chat-avatar">U</div>
                     <div class="overflow-hidden">
                         <h3 class="font-bold text-xs truncate group-hover:text-indigo-400 transition-colors" id="active-chat-name">Username</h3>
-                        <!-- Online & Last Seen Hidden as requested -->
                         <span class="text-[9px] text-slate-400 truncate hidden" id="active-chat-status">Offline</span>
                     </div>
                 </div>
             </div>
-            <!-- Header Quick Action Buttons -->
             <div class="flex items-center gap-1 flex-shrink-0">
                 <button onclick="toggleSearchBox()" class="p-1.5 text-slate-400 hover:text-white text-xs bg-slate-800/60 rounded-lg cursor-pointer" title="Search Keywords">🔍</button>
                 <button onclick="openMediaGallery('file')" class="p-1.5 text-slate-400 hover:text-white text-xs bg-slate-800/60 rounded-lg cursor-pointer" title="Files">📁</button>
@@ -32,18 +29,14 @@
             </div>
         </div>
 
-        <!-- Hidden Search Bar Slide-down -->
         <div id="search-container" class="hidden p-2 bg-slate-950 border-b border-slate-800 flex items-center gap-2 z-20 flex-shrink-0">
             <input type="text" id="search-keyword-input" placeholder="Search keywords in chat..." oninput="filterMessages(this.value)" class="flex-1 px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-indigo-500">
             <button onclick="toggleSearchBox()" class="text-slate-400 hover:text-white text-xs px-2 py-1 bg-slate-800 rounded-lg cursor-pointer">Close</button>
         </div>
 
-        <!-- Messages Area -->
         <div id="chat-messages" class="flex-1 min-h-0 overflow-y-auto p-4 space-y-3 bg-slate-950 flex flex-col">
-            <!-- Messages load here -->
-        </div>
+            </div>
 
-        <!-- Live Typing Indicator Bar -->
         <div id="typing-indicator" class="hidden px-4 py-1.5 bg-slate-950 text-[11px] text-indigo-400 italic flex items-center gap-1.5 flex-shrink-0">
             <span class="flex gap-1">
                 <span class="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce"></span>
@@ -53,7 +46,6 @@
             <span id="typing-text">typing...</span>
         </div>
 
-        <!-- Multi-Select Action Footer Bar -->
         <div id="multi-select-bar" class="hidden absolute bottom-0 left-0 right-0 bg-slate-900 border-t border-indigo-500/50 p-3 shadow-2xl z-40 flex items-center justify-between">
             <span id="selected-count-text" class="text-xs font-semibold text-indigo-300">0 selected</span>
             <div class="flex items-center gap-2">
@@ -62,13 +54,11 @@
             </div>
         </div>
 
-        <!-- Undo Notification Banner -->
         <div id="undo-banner" class="hidden absolute bottom-20 left-4 right-4 bg-slate-800 border border-indigo-500/50 rounded-xl p-3 shadow-2xl z-50 flex items-center justify-between">
             <span id="undo-text" class="text-xs text-slate-200">Message deleted.</span>
             <button type="button" onclick="triggerUndoAction()" class="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-lg cursor-pointer">Undo (<span id="undo-countdown">10</span>s)</button>
         </div>
 
-        <!-- Custom Styled App Modal / Popup -->
         <div id="custom-app-modal" class="hidden absolute inset-0 bg-slate-950/80 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
             <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-xs p-4 shadow-2xl flex flex-col gap-3">
                 <h3 id="custom-modal-title" class="font-bold text-sm text-white">Notice</h3>
@@ -77,14 +67,12 @@
             </div>
         </div>
 
-        <!-- Message Options Popup Modal (Click outside backdrop to close) -->
         <div id="message-options-modal" onclick="if(event.target === this) closeMessageOptions()" class="hidden absolute inset-0 bg-slate-950/70 z-50 flex items-center justify-center p-4 backdrop-blur-xs cursor-pointer">
             <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-xs p-3 shadow-2xl flex flex-col gap-2 cursor-default" onclick="event.stopPropagation()">
                 <div class="text-xs font-bold text-slate-400 pb-2 border-b border-slate-800 flex justify-between items-center">
                     <span>Message Options</span>
                     <button onclick="closeMessageOptions()" class="text-slate-400 hover:text-white text-base cursor-pointer">&times;</button>
                 </div>
-                <!-- Quick Emoji Reactions Tray -->
                 <div id="reaction-tray" class="flex items-center justify-between px-2 py-1.5 bg-slate-950 rounded-xl border border-slate-800 text-base">
                     <button type="button" onclick="addReactionToMessage('❤️')" class="hover:scale-125 transition-transform cursor-pointer">❤️</button>
                     <button type="button" onclick="addReactionToMessage('👍')" class="hover:scale-125 transition-transform cursor-pointer">👍</button>
@@ -97,7 +85,6 @@
             </div>
         </div>
 
-        <!-- User Profile Modal Drawer -->
         <div id="user-profile-modal" class="hidden absolute inset-0 bg-slate-950/80 z-50 flex flex-col justify-end backdrop-blur-sm">
             <div class="bg-slate-900 border-t border-slate-800 rounded-t-3xl p-5 shadow-2xl flex flex-col gap-4 max-h-[85vh] overflow-y-auto animate-in slide-in-from-bottom duration-200 relative">
                 
@@ -138,7 +125,6 @@
             </div>
         </div>
 
-        <!-- Reply Preview Bar -->
         <div id="reply-preview-bar" class="hidden p-2.5 bg-slate-900 border-t border-slate-800 items-center justify-between z-20 flex-shrink-0">
             <div class="flex flex-col border-l-2 border-indigo-500 pl-2 overflow-hidden">
                 <span class="text-[10px] font-bold text-indigo-400" id="reply-target-sender">Replying to...</span>
@@ -147,7 +133,6 @@
             <button type="button" onclick="cancelReply()" class="text-slate-400 hover:text-white text-base px-2 cursor-pointer">&times;</button>
         </div>
 
-        <!-- Edit Message Staging Bar -->
         <div id="edit-preview-bar" class="hidden p-2.5 bg-slate-900 border-t border-slate-800 items-center justify-between z-20 flex-shrink-0">
             <div class="flex flex-col border-l-2 border-amber-500 pl-2 overflow-hidden">
                 <span class="text-[10px] font-bold text-amber-400">Editing Message</span>
@@ -156,7 +141,6 @@
             <button type="button" onclick="cancelEdit()" class="text-slate-400 hover:text-white text-base px-2 cursor-pointer">&times;</button>
         </div>
 
-        <!-- Media Preview Staging Bar -->
         <div id="media-preview-bar" class="hidden p-2.5 bg-slate-950 border-t border-slate-800 flex-col gap-1.5 z-20 flex-shrink-0">
             <div class="flex items-center justify-between">
                 <span class="text-xs font-semibold text-indigo-400">Staged Media Preview</span>
@@ -169,19 +153,16 @@
             <span class="text-[10px] text-slate-400 text-center" id="upload-status-text">Ready. Hit Send button to upload & deliver.</span>
         </div>
 
-        <!-- Hidden File Inputs -->
         <input type="file" id="media-file-input" class="hidden" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.txt" onchange="stageFileSelected(event)">
         <input type="file" id="camera-photo-input" class="hidden" accept="image/*" capture="environment" onchange="stageFileSelected(event)">
         <input type="file" id="camera-video-input" class="hidden" accept="video/*" capture="environment" onchange="stageFileSelected(event)">
 
-        <!-- Attachment Options Popup Menu -->
         <div id="attachment-menu" class="hidden absolute bottom-16 left-3 bg-slate-800 border border-slate-700 rounded-2xl shadow-xl p-2 z-30 flex flex-col gap-1 w-48 backdrop-blur-md">
             <button type="button" onclick="document.getElementById('media-file-input').click(); toggleAttachmentMenu();" class="flex items-center gap-3 px-3 py-2 text-xs font-medium text-slate-200 hover:bg-slate-700/80 rounded-xl transition-all cursor-pointer">📁 File / Document</button>
             <button type="button" onclick="document.getElementById('camera-photo-input').click(); toggleAttachmentMenu();" class="flex items-center gap-3 px-3 py-2 text-xs font-medium text-slate-200 hover:bg-slate-700/80 rounded-xl transition-all cursor-pointer">📷 Take Photo</button>
             <button type="button" onclick="document.getElementById('camera-video-input').click(); toggleAttachmentMenu();" class="flex items-center gap-3 px-3 py-2 text-xs font-medium text-slate-200 hover:bg-slate-700/80 rounded-xl transition-all cursor-pointer">📹 Record Video Note</button>
         </div>
 
-        <!-- Media Gallery Modal Drawer -->
         <div id="media-gallery-modal" class="hidden absolute inset-0 bg-slate-950/90 z-40 flex flex-col p-4 backdrop-blur-sm">
             <div class="flex justify-between items-center pb-3 border-b border-slate-800">
                 <h3 class="font-bold text-sm text-white" id="gallery-title">Chat Media</h3>
@@ -190,7 +171,6 @@
             <div id="gallery-content-grid" class="flex-1 overflow-y-auto grid grid-cols-2 gap-2 pt-3"></div>
         </div>
 
-        <!-- Bottom Input Bar -->
         <form id="chat-form" onsubmit="handleFormSubmit(event)" class="p-3 bg-slate-900 border-t border-slate-800 flex items-center gap-2 relative z-25 flex-shrink-0">
             <button type="button" id="attach-btn" onclick="toggleAttachmentMenu()" class="p-2 text-slate-400 hover:text-indigo-400 transition-colors text-lg font-bold cursor-pointer flex-shrink-0" title="Attach Media">+</button>
             
@@ -264,7 +244,7 @@
         let typingTimeout = null;
 
         if (messagesCache.length > 0) {
-            renderMessages(messagesCache);
+            renderMessages(messagesCache, true);
         }
 
         function showCustomAlert(title, message, onOk = null) {
@@ -390,7 +370,7 @@
             });
         }
 
-        async function fetchMessages() {
+        async function fetchMessages(forceScroll = false) {
             if (navigator.onLine) {
                 await flushOfflineQueue();
             }
@@ -402,8 +382,13 @@
                 .order('created_at', { ascending: true });
 
             if (!error && messages) {
-                saveLocalCache(messages);
-                renderMessages(messagesCache);
+                // Check if message count or reactions changed before re-rendering unnecessarily
+                const cachedString = JSON.stringify(messagesCache);
+                const fetchedString = JSON.stringify(messages);
+                if (cachedString !== fetchedString) {
+                    saveLocalCache(messages);
+                    renderMessages(messagesCache, forceScroll);
+                }
                 markIncomingMessagesAsRead(messages);
             }
         }
@@ -438,8 +423,12 @@
             }
         }
 
-        function renderMessages(messages) {
+        function renderMessages(messages, forceScroll = false) {
             const container = document.getElementById('chat-messages');
+            
+            // Check if user is currently near the bottom (within 100px)
+            const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 150;
+
             container.innerHTML = '';
 
             let hiddenForMe = [];
@@ -463,16 +452,19 @@
                     divider.innerHTML = `<span class="px-3 py-1 bg-slate-900 border border-slate-800 text-[10px] text-slate-400 rounded-full font-medium">${msgDateLabel}</span>`;
                     container.appendChild(divider);
                 }
-                appendMessageToDOM(msg, false);
+                appendMessageToDOM(msg);
             });
 
-            container.scrollTop = container.scrollHeight;
+            // Only scroll to bottom if forced (e.g. initial load or message sent) or user was already at the bottom
+            if (forceScroll || isNearBottom) {
+                container.scrollTop = container.scrollHeight;
+            }
         }
 
         function filterMessages(keyword) {
             const term = keyword.toLowerCase();
             if (!term) {
-                renderMessages(messagesCache);
+                renderMessages(messagesCache, false);
                 return;
             }
             const filtered = messagesCache.filter(m => {
@@ -481,10 +473,10 @@
                 if (type === 'text' && m.content.toLowerCase().includes(term)) return true;
                 return false;
             });
-            renderMessages(filtered);
+            renderMessages(filtered, false);
         }
 
-        function appendMessageToDOM(msg, scrollToBottom = true) {
+        function appendMessageToDOM(msg) {
             const container = document.getElementById('chat-messages');
             const isMe = msg.sender_username === currentUser.username;
 
@@ -558,7 +550,9 @@
             });
 
             const bubble = document.createElement('div');
-            bubble.className = `flex-1 px-3 py-2 rounded-2xl text-sm relative ${isMe ? 'bg-indigo-600 text-white rounded-br-none' : 'bg-slate-800 text-slate-100 rounded-bl-none border border-slate-700/50'}`;
+            // Added pb-5 if reactions exist so text never overlaps or gets blocked by reaction badges
+            const hasReactions = msg.reactions && Object.keys(msg.reactions).length > 0;
+            bubble.className = `flex-1 px-3 py-2 ${hasReactions ? 'pb-5' : ''} rounded-2xl text-sm relative ${isMe ? 'bg-indigo-600 text-white rounded-br-none' : 'bg-slate-800 text-slate-100 rounded-bl-none border border-slate-700/50'}`;
 
             if (msg.reply_to) {
                 const replySnippet = document.createElement('div');
@@ -579,7 +573,6 @@
             } else if (type === 'file') {
                 contentBody.innerHTML = `<a href="${msg.content}" target="_blank" download class="flex items-center gap-2 underline text-xs font-semibold py-1">📁 Download File Attachment</a>`;
             } else {
-                // Auto-detect if raw content is a uploaded media link or audio webm/mp4 link despite legacy message_type being text
                 if (msg.content.includes('/storage/v1/object/public/chat-media/')) {
                     if (msg.content.endsWith('.webm') || msg.content.endsWith('.mp4') || msg.content.includes('voice_')) {
                         contentBody.innerHTML = `<audio src="${msg.content}" controls class="h-10 w-full"></audio>`;
@@ -601,10 +594,10 @@
                 contentBody.appendChild(editedTag);
             }
 
-            // Render Reactions Badge if present
-            if (msg.reactions && Object.keys(msg.reactions).length > 0) {
+            // Render Reactions Badge cleanly positioned without blocking text
+            if (hasReactions) {
                 const reactionBadge = document.createElement('div');
-                reactionBadge.className = `absolute -bottom-2.5 ${isMe ? 'right-2' : 'left-2'} bg-slate-900 border border-slate-700 rounded-full px-2 py-0.5 text-[11px] flex items-center gap-1 shadow`;
+                reactionBadge.className = `absolute bottom-1 ${isMe ? 'right-2' : 'left-2'} bg-slate-900 border border-slate-700 rounded-full px-2 py-0.5 text-[11px] flex items-center gap-1 shadow z-10`;
                 let reactionHtml = '';
                 for (const [emoji, users] of Object.entries(msg.reactions)) {
                     if (users && users.length > 0) {
@@ -639,8 +632,6 @@
             wrapper.appendChild(rowFlex);
             wrapper.appendChild(metaRow);
             container.appendChild(wrapper);
-
-            if (scrollToBottom) container.scrollTop = container.scrollHeight;
         }
 
         // --- REAL-TIME INSTANT MESSAGE LISTENER ---
@@ -684,7 +675,7 @@
                         if (index !== -1) {
                             messagesCache[index] = updatedMsg;
                             saveLocalCache(messagesCache);
-                            renderMessages(messagesCache);
+                            renderMessages(messagesCache, false);
                         }
                     }
                 )
@@ -718,7 +709,7 @@
                 if (!messagesCache.some(m => m.id === newMsg.id)) {
                     messagesCache.push(newMsg);
                     saveLocalCache(messagesCache);
-                    renderMessages(messagesCache);
+                    renderMessages(messagesCache, true);
                     if (newMsg.receiver_username === currentUser.username) {
                         markIncomingMessagesAsRead([newMsg]);
                     }
@@ -786,7 +777,7 @@
                 try { hiddenForMe = JSON.parse(localStorage.getItem(`chatlite_deleted_for_me_${currentUser.username}_${targetUsername}`) || '[]'); } catch(e) {}
                 hiddenForMe.push(msg.id);
                 localStorage.setItem(`chatlite_deleted_for_me_${currentUser.username}_${targetUsername}`, JSON.stringify(hiddenForMe));
-                renderMessages(messagesCache);
+                renderMessages(messagesCache, false);
             };
             actionsContainer.appendChild(deleteForMeBtn);
 
@@ -803,7 +794,6 @@
         async function addReactionToMessage(emoji) {
             if (!activeSelectedMessageForOptions || !activeSelectedMessageForOptions.id) return;
             
-            // Find current freshest copy from local cache to ensure correct existing reactions state
             const msgId = activeSelectedMessageForOptions.id;
             const msg = messagesCache.find(m => m.id === msgId) || activeSelectedMessageForOptions;
             closeMessageOptions();
@@ -822,10 +812,10 @@
                 if (reactions[emoji].length === 0) delete reactions[emoji];
             }
 
-            // Immediately update local cache & DOM for high responsiveness
+            // Immediately update local cache & DOM without resetting scroll position
             msg.reactions = reactions;
             saveLocalCache(messagesCache);
-            renderMessages(messagesCache);
+            renderMessages(messagesCache, false);
 
             if (navigator.onLine) {
                 const { error } = await supabaseClient
@@ -905,7 +895,7 @@
                             target.content = content;
                             target.is_edited = true;
                             saveLocalCache(messagesCache);
-                            renderMessages(messagesCache);
+                            renderMessages(messagesCache, false);
                         }
                     } else {
                         showCustomAlert('Error', 'Failed to update message.');
@@ -933,7 +923,7 @@
                 const queue = loadOfflineQueue();
                 queue.push({ ...payload, is_offline_pending: true });
                 saveOfflineQueue(queue);
-                renderMessages(messagesCache);
+                renderMessages(messagesCache, true);
                 return;
             }
 
@@ -942,7 +932,7 @@
                 if (!messagesCache.some(m => m.id === data[0].id)) {
                     messagesCache.push(data[0]);
                     saveLocalCache(messagesCache);
-                    renderMessages(messagesCache);
+                    renderMessages(messagesCache, true);
                 }
             }
         }
@@ -1029,7 +1019,7 @@
                 if (!messagesCache.some(m => m.id === data[0].id)) {
                     messagesCache.push(data[0]);
                     saveLocalCache(messagesCache);
-                    renderMessages(messagesCache);
+                    renderMessages(messagesCache, true);
                 }
             }
 
@@ -1169,11 +1159,11 @@
         }
 
         // Initial fetch, realtime subscription, and heartbeat polling setup
-        fetchMessages();
+        fetchMessages(true);
         subscribeToRealtimeChannels();
 
         setInterval(() => {
-            fetchMessages();
+            fetchMessages(false);
         }, 5000);
     </script>
 </body>
