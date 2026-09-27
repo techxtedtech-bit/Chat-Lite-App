@@ -77,9 +77,9 @@
             </div>
         </div>
 
-        <!-- Message Options Popup Modal -->
-        <div id="message-options-modal" class="hidden absolute inset-0 bg-slate-950/70 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
-            <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-xs p-3 shadow-2xl flex flex-col gap-2">
+        <!-- Message Options Popup Modal (Click outside backdrop to close) -->
+        <div id="message-options-modal" onclick="if(event.target === this) closeMessageOptions()" class="hidden absolute inset-0 bg-slate-950/70 z-50 flex items-center justify-center p-4 backdrop-blur-xs cursor-pointer">
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-xs p-3 shadow-2xl flex flex-col gap-2 cursor-default" onclick="event.stopPropagation()">
                 <div class="text-xs font-bold text-slate-400 pb-2 border-b border-slate-800 flex justify-between items-center">
                     <span>Message Options</span>
                     <button onclick="closeMessageOptions()" class="text-slate-400 hover:text-white text-base cursor-pointer">&times;</button>
@@ -477,7 +477,8 @@
             }
             const filtered = messagesCache.filter(m => {
                 if (m.is_deleted_for_everyone) return false;
-                if (m.message_type === 'text' && m.content.toLowerCase().includes(term)) return true;
+                const type = m.message_type || 'text';
+                if (type === 'text' && m.content.toLowerCase().includes(term)) return true;
                 return false;
             });
             renderMessages(filtered);
@@ -573,10 +574,23 @@
                 contentBody.innerHTML = `<img src="${msg.content}" class="rounded-xl max-h-60 w-full object-cover cursor-pointer" onclick="window.open('${msg.content}')">`;
             } else if (type === 'video') {
                 contentBody.innerHTML = `<video src="${msg.content}" controls class="rounded-xl max-h-60 w-full"></video>`;
+            } else if (type === 'audio') {
+                contentBody.innerHTML = `<audio src="${msg.content}" controls class="h-10 w-full"></audio>`;
             } else if (type === 'file') {
                 contentBody.innerHTML = `<a href="${msg.content}" target="_blank" download class="flex items-center gap-2 underline text-xs font-semibold py-1">📁 Download File Attachment</a>`;
             } else {
-                contentBody.textContent = msg.content;
+                // Auto-detect if raw content is a uploaded media link or audio webm/mp4 link despite legacy message_type being text
+                if (msg.content.includes('/storage/v1/object/public/chat-media/')) {
+                    if (msg.content.endsWith('.webm') || msg.content.endsWith('.mp4') || msg.content.includes('voice_')) {
+                        contentBody.innerHTML = `<audio src="${msg.content}" controls class="h-10 w-full"></audio>`;
+                    } else if (msg.content.match(/\.(jpeg|jpg|gif|png|webp)$/i)) {
+                        contentBody.innerHTML = `<img src="${msg.content}" class="rounded-xl max-h-60 w-full object-cover cursor-pointer" onclick="window.open('${msg.content}')">`;
+                    } else {
+                        contentBody.innerHTML = `<a href="${msg.content}" target="_blank" download class="flex items-center gap-2 underline text-xs font-semibold py-1">📁 Download File Attachment</a>`;
+                    }
+                } else {
+                    contentBody.textContent = msg.content;
+                }
             }
             bubble.appendChild(contentBody);
 
@@ -788,10 +802,17 @@
         // --- EMOJI REACTION HANDLER ---
         async function addReactionToMessage(emoji) {
             if (!activeSelectedMessageForOptions || !activeSelectedMessageForOptions.id) return;
-            const msg = activeSelectedMessageForOptions;
+            
+            // Find current freshest copy from local cache to ensure correct existing reactions state
+            const msgId = activeSelectedMessageForOptions.id;
+            const msg = messagesCache.find(m => m.id === msgId) || activeSelectedMessageForOptions;
             closeMessageOptions();
 
-            let reactions = msg.reactions || {};
+            let reactions = {};
+            if (msg.reactions && typeof msg.reactions === 'object') {
+                reactions = JSON.parse(JSON.stringify(msg.reactions));
+            }
+
             if (!reactions[emoji]) reactions[emoji] = [];
 
             if (!reactions[emoji].includes(currentUser.username)) {
@@ -801,16 +822,19 @@
                 if (reactions[emoji].length === 0) delete reactions[emoji];
             }
 
+            // Immediately update local cache & DOM for high responsiveness
+            msg.reactions = reactions;
+            saveLocalCache(messagesCache);
+            renderMessages(messagesCache);
+
             if (navigator.onLine) {
                 const { error } = await supabaseClient
                     .from('messages')
                     .update({ reactions: reactions })
                     .eq('id', msg.id);
 
-                if (!error) {
-                    msg.reactions = reactions;
-                    saveLocalCache(messagesCache);
-                    renderMessages(messagesCache);
+                if (error) {
+                    console.error('Failed to sync reaction to Supabase:', error.message);
                 }
             }
         }
@@ -1112,7 +1136,14 @@
             modal.classList.remove('hidden');
             grid.innerHTML = '';
 
-            const matching = messagesCache.filter(m => !m.is_deleted_for_everyone && m.message_type === typeFilter);
+            const matching = messagesCache.filter(m => {
+                if (m.is_deleted_for_everyone) return false;
+                const type = m.message_type || 'text';
+                if (type === typeFilter) return true;
+                if (typeFilter === 'file' && m.content.includes('/storage/v1/object/public/chat-media/') && !m.content.match(/\.(jpeg|jpg|gif|png|webp|webm|mp4)$/i)) return true;
+                return false;
+            });
+
             if (matching.length === 0) {
                 grid.innerHTML = `<span class="text-xs text-slate-500 col-span-2 text-center py-6">No ${typeFilter}s found.</span>`;
                 return;
@@ -1121,9 +1152,10 @@
             matching.forEach(m => {
                 const card = document.createElement('div');
                 card.className = 'bg-slate-900 border border-slate-800 rounded-lg p-2 flex flex-col items-center justify-center';
-                if (typeFilter === 'image') {
+                const type = m.message_type || 'text';
+                if (type === 'image' || m.content.match(/\.(jpeg|jpg|gif|png|webp)$/i)) {
                     card.innerHTML = `<img src="${m.content}" class="h-24 w-full object-cover rounded cursor-pointer" onclick="window.open('${m.content}')">`;
-                } else if (typeFilter === 'video') {
+                } else if (type === 'video' || m.content.match(/\.(webm|mp4)$/i)) {
                     card.innerHTML = `<video src="${m.content}" class="h-24 w-full object-cover rounded cursor-pointer" controls></video>`;
                 } else {
                     card.innerHTML = `<a href="${m.content}" target="_blank" class="text-xs text-indigo-400 underline">📁 Download File</a>`;
