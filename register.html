@@ -6,22 +6,35 @@
     <title>Chat Lite - Create Profile</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f8fafc;
+            color: #0f172a;
+            margin: 0;
+            font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+            min-height: 100vh;
+        }
+
+        /* Faded background pattern of African scripts/texts */
+        .african-text-pattern {
+            background-color: #fcfcfc;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400' viewBox='0 0 400 400'%3E%3Cg fill='%23000000' fill-opacity='0.025' font-family='serif' font-size='14'%3E%3Ctext x='20' y='40'%3EAdlam Nsibidi Tifinagh Ge'ez Vai Osmanya%3C/text%3E%3Ctext x='150' y='90'%3E⥾ ߀ ⴰ ᚛ 𐴀 ꕉ ꭲ ߊ ꘓ%3C/text%3E%3Ctext x='40' y='140'%3EAncient Scripts Heritage Africa Legacy Symbols%3C/text%3E%3Ctext x='200' y='190'%3Eⵜⵉⴼⵉⵏⴰⵖ ⴳⴻⵄⴻⵣ ⵏⵙⵉⴱⵉⴷⵉ ⴹ ⵚ ⵜ%3C/text%3E%3Ctext x='30' y='240'%3EGe'ez Ethiopic Nsibidi Script Writing%3C/text%3E%3Ctext x='120' y='290'%3Eߛ ߜ ߝ ߞ ߟ ߠ ߡ ߢ ߣ ߤ ߥ ߦ%3C/text%3E%3Ctext x='60' y='340'%3EAbugida Syllabary Ideograph Tradition%3C/text%3E%3Ctext x='180' y='380'%3Eⴰⴱⴻⵛⴷ ⴻⴼⴳⵀ ⵉⵀⴽⵍⵎⵏⵓཔⵇⵔⵙⵜⵡⵅⵢⵣ%3C/text%3E%3C/g%3E%3C/svg%3E");
+        }
+    </style>
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans">
+<body class="african-text-pattern text-slate-900 min-h-screen flex flex-col font-sans">
 
-    <div class="flex-1 flex flex-col w-full max-w-md mx-auto relative overflow-hidden shadow-2xl bg-slate-900 border-x border-slate-800 h-screen">
+    <div class="flex-1 flex flex-col w-full max-w-md mx-auto relative overflow-hidden shadow-2xl bg-white border-x border-slate-100 h-screen">
         
-        <!-- Background Image Container -->
-        <div class="absolute inset-0 bg-cover bg-center" style="background-image: url('image1-bg.jpg');">
-            <div class="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/85 to-slate-950/60"></div>
-        </div>
-
         <!-- Content Area -->
         <div class="relative z-10 flex flex-col justify-center flex-1 p-6 h-full overflow-y-auto">
             <div class="space-y-6 my-auto">
                 <div class="flex items-center justify-between">
-                    <button onclick="window.location.href='index.html'" class="text-slate-300 hover:text-white text-sm flex items-center gap-1 cursor-pointer bg-slate-800/60 px-3 py-1.5 rounded-lg border border-slate-700/50 backdrop-blur-md transition-all">&larr; Back</button>
-                    <h2 class="text-xl font-bold text-white tracking-wide">Create Profile</h2>
+                    <button onclick="window.location.href='index.html'" class="text-slate-600 hover:text-slate-950 text-sm font-medium flex items-center gap-1 cursor-pointer bg-slate-100 hover:bg-slate-200 px-3.5 py-2 rounded-xl border border-slate-200 transition-all">&larr; Back</button>
+                    <h2 class="text-xl font-bold text-slate-950 tracking-wide">Create Profile</h2>
                     <div class="w-12"></div>
                 </div>
 
@@ -30,26 +43,27 @@
                     <input type="password" style="display:none" name="prevent_autofill">
                     
                     <div>
-                        <label class="block text-xs font-medium text-slate-300 mb-1">Full Name</label>
-                        <input type="text" id="reg-name" name="new_fullname_random" autocomplete="off" required class="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:border-orange-500 focus:bg-white/10 text-sm text-white backdrop-blur-md transition-all shadow-inner">
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Full Name</label>
+                        <input type="text" id="reg-name" name="new_fullname_random" autocomplete="off" required class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-[#84cc16] focus:bg-white text-sm text-slate-900 transition-all shadow-inner">
                     </div>
                     <div>
-                        <label class="block text-xs font-medium text-slate-300 mb-1">Gender</label>
-                        <select id="reg-gender" name="new_gender_random" class="w-full px-4 py-3 bg-slate-950/60 border border-white/10 rounded-xl focus:outline-none focus:border-orange-500 text-sm text-white backdrop-blur-md transition-all">
-                            <option value="Male" class="bg-slate-900">Male</option>
-                            <option value="Female" class="bg-slate-900">Female</option>
-                            <option value="Other" class="bg-slate-900">Other</option>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Gender</label>
+                        <select id="reg-gender" name="new_gender_random" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-[#84cc16] focus:bg-white text-sm text-slate-900 transition-all shadow-inner">
+                            <option value="Male" class="bg-white">Male</option>
+                            <option value="Female" class="bg-white">Female</option>
+                            <option value="Other" class="bg-white">Other</option>
                         </select>
                     </div>
                     <div>
-                        <label class="block text-xs font-medium text-slate-300 mb-1">Username</label>
-                        <input type="text" id="reg-username" name="new_username_random" autocomplete="off" required class="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:border-orange-500 focus:bg-white/10 text-sm text-white backdrop-blur-md transition-all shadow-inner">
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Username</label>
+                        <input type="text" id="reg-username" name="new_username_random" autocomplete="off" required class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-[#84cc16] focus:bg-white text-sm text-slate-900 transition-all shadow-inner">
                     </div>
                     <div>
-                        <label class="block text-xs font-medium text-slate-300 mb-1">Password</label>
-                        <input type="password" id="reg-password" name="new_password_random" autocomplete="new-password" required class="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:border-orange-500 focus:bg-white/10 text-sm text-white backdrop-blur-md transition-all shadow-inner">
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Password</label>
+                        <input type="password" id="reg-password" name="new_password_random" autocomplete="new-password" required class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-[#84cc16] focus:bg-white text-sm text-slate-900 transition-all shadow-inner">
                     </div>
-                    <button type="submit" id="submit-btn" class="w-full py-3.5 bg-orange-600 hover:bg-orange-500 font-semibold rounded-xl shadow-lg shadow-orange-600/30 transition-all mt-4 cursor-pointer text-white flex items-center justify-center">
+                    <!-- Register Submit Button Styled with Lemon Theme -->
+                    <button type="submit" id="submit-btn" class="w-full py-3.5 bg-[#84cc16] hover:bg-[#65a30d] text-slate-950 font-bold rounded-xl shadow-lg shadow-lime-500/20 transition-all mt-4 cursor-pointer flex items-center justify-center">
                         Register Profile
                     </button>
                 </form>
@@ -57,16 +71,17 @@
         </div>
 
         <!-- Custom Styled Alert/Notification Modal -->
-        <div id="custom-alert-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md hidden items-center justify-center p-4 z-50">
-            <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-xs p-5 space-y-4 shadow-2xl text-center">
-                <div class="w-10 h-10 bg-orange-600/20 text-orange-500 rounded-full flex items-center justify-center mx-auto text-lg font-bold" id="custom-alert-icon">
+        <div id="custom-alert-modal" class="fixed inset-0 bg-slate-950/60 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+            <div class="bg-white border border-slate-200 rounded-2xl w-full max-w-xs p-5 space-y-4 shadow-2xl text-center">
+                <div class="w-10 h-10 bg-lime-100 text-[#65a30d] rounded-full flex items-center justify-center mx-auto text-lg font-bold" id="custom-alert-icon">
                     !
                 </div>
                 <div class="space-y-1">
-                    <h4 class="font-bold text-sm text-white" id="custom-alert-title">Notice</h4>
-                    <p class="text-xs text-slate-300 leading-relaxed whitespace-pre-line" id="custom-alert-message">Something went wrong.</p>
+                    <h4 class="font-bold text-sm text-slate-900" id="custom-alert-title">Notice</h4>
+                    <p class="text-xs text-slate-600 leading-relaxed whitespace-pre-line" id="custom-alert-message">Something went wrong.</p>
                 </div>
-                <button type="button" onclick="closeCustomAlert()" class="w-full py-2.5 bg-orange-600 hover:bg-orange-500 text-white font-semibold text-xs rounded-xl transition-all cursor-pointer shadow-lg shadow-orange-600/20">
+                <!-- Alert Modal Button Styled with Black Theme -->
+                <button type="button" onclick="closeCustomAlert()" class="w-full py-2.5 bg-slate-900 hover:bg-black text-white font-semibold text-xs rounded-xl transition-all cursor-pointer shadow-md">
                     Okay
                 </button>
             </div>
