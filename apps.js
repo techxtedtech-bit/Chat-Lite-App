@@ -20,6 +20,7 @@ try {
 let currentUser = JSON.parse(localStorage.getItem('chatlite_persistent_user')) || null;
 let activeChatUser = null;
 let messageSubscription = null;
+let globalMessageSubscription = null;
 
 // --- AUTO-RESUME SESSION ON LOAD ---
 document.addEventListener('DOMContentLoaded', () => {
@@ -30,10 +31,83 @@ document.addEventListener('DOMContentLoaded', () => {
         }  
         loadChatList();  
         switchView('view-chatlist');
+        setupGlobalNotificationListener();
+        checkNotificationPermissionState();
     } else {
         switchView('view-welcome');
     }
 });
+
+
+/* ==========================================
+   NOTIFICATIONS SETUP & DISPATCHER
+========================================== */
+
+function checkNotificationPermissionState() {
+    if ('Notification' in window && Notification.permission === 'default') {
+        // Automatically request permission on login/load or prompt via user gesture
+        Notification.requestPermission().then((permission) => {
+            console.log('Notification permission status:', permission);
+        });
+    }
+}
+
+function triggerSWNotification(title, body, targetUrl) {
+    if ('Notification' in window && Notification.permission === 'granted') {
+        if ('navigator' in window && navigator.serviceWorker) {
+            navigator.serviceWorker.ready.then((registration) => {
+                registration.showNotification(title, {
+                    body: body,
+                    icon: './icon.png',
+                    badge: './badge.png',
+                    data: { url: targetUrl || './' },
+                    vibrate: [200, 100, 200],
+                    tag: 'chatlite-incoming-msg',
+                    renotify: true
+                });
+            }).catch(err => {
+                console.warn('Service worker ready check failed, falling back to direct notification:', err);
+                new Notification(title, { body: body, icon: './icon.png' });
+            });
+        } else {
+            new Notification(title, { body: body, icon: './icon.png' });
+        }
+    }
+}
+
+// Global listener to catch incoming messages anywhere in the app and trigger a notification
+function setupGlobalNotificationListener() {
+    if (!currentUser || !currentUser.username || !supabaseClient) return;
+
+    if (globalMessageSubscription) {
+        supabaseClient.removeChannel(globalMessageSubscription);
+    }
+
+    globalMessageSubscription = supabaseClient
+        .channel('public:global_messages_listener')
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, async payload => {
+            const msg = payload.new;
+            
+            // Check if message is incoming for the current user from someone else
+            if (msg.receiver_username === currentUser.username && msg.sender_username !== currentUser.username) {
+                
+                // Fetch sender name for a cleaner notification title
+                const { data: senderProfile } = await supabaseClient
+                    .from('profiles')
+                    .select('name, username')
+                    .eq('username', msg.sender_username)
+                    .maybeSingle();
+
+                const senderName = senderProfile ? (senderProfile.name || senderProfile.username) : msg.sender_username;
+                let previewText = msg.content || 'New message';
+                if (msg.media_url) previewText = '📎 Sent an attachment';
+
+                triggerSWNotification(`New message from ${senderName}`, previewText, './');
+            }
+        })
+        .subscribe();
+}
+
 
 // --- VIEW NAVIGATION CONTROLLER ---
 function switchView(viewId) {
@@ -146,6 +220,8 @@ async function handleLogin(e) {
       
     loadChatList();  
     switchView('view-chatlist');
+    setupGlobalNotificationListener();
+    checkNotificationPermissionState();
 }
 
 function handleLogout() {
@@ -154,6 +230,9 @@ function handleLogout() {
     localStorage.removeItem('chatlite_persistent_user');
     if (messageSubscription && supabaseClient) {
         supabaseClient.removeChannel(messageSubscription);
+    }
+    if (globalMessageSubscription && supabaseClient) {
+        supabaseClient.removeChannel(globalMessageSubscription);
     }
     switchView('view-welcome');
 }
@@ -269,7 +348,7 @@ function appendMessageToDOM(msg) {
 
 async function sendMessage(e, mediaUrl = null) {
     if (e) e.preventDefault();
-    if (!supabaseClient || !currentUser || !activeChatUser) return;
+    if (!supabaseClient || !currentUser || !activeChatRoom) return; // Note: safe guard checks
 
     const input = document.getElementById('message-input');  
     const content = input ? input.value.trim() : '';  
