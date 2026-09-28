@@ -91,7 +91,8 @@ self.addEventListener('push', (event) => {
         badge: './badge.png',
         data: { url: data.url || './chatlist.html' },
         vibrate: [200, 100, 200],
-        tag: 'chatlite-incoming-msg',
+        // UPDATED: Using a dynamic unique tag based on the current timestamp so notifications stack
+        tag: 'chatlite-msg-' + Date.now(),
         renotify: true
     };
 
@@ -110,7 +111,8 @@ self.addEventListener('message', (event) => {
             badge: './badge.png',
             data: { url: url || './chatlist.html' },
             vibrate: [200, 100, 200],
-            tag: 'chatlite-incoming-msg',
+            // UPDATED: Using a dynamic unique tag based on the current timestamp so notifications stack
+            tag: 'chatlite-msg-' + Date.now(),
             renotify: true
         };
 
