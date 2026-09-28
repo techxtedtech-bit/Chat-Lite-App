@@ -50,6 +50,14 @@
             </button>
         </div>
 
+        <!-- NOTIFICATION PERMISSION BANNER (FOR FIREFOX & CHROME COMPLIANCE) -->
+        <div id="notification-banner" class="hidden px-4 py-2 bg-orange-600/20 border-b border-orange-500/30 flex items-center justify-between text-xs text-orange-300">
+            <span>Enable notifications to get message alerts.</span>
+            <button onclick="requestNotificationPermissionUserGesture()" class="bg-orange-600 hover:bg-orange-500 text-white font-semibold px-3 py-1 rounded-lg transition-all cursor-pointer">
+                Turn On
+            </button>
+        </div>
+
         <!-- ACTION BAR -->
         <div class="px-4 py-3 bg-slate-950 border-b border-slate-800/80 flex items-center gap-2">
 
@@ -139,7 +147,7 @@
             initHeaderProfile();
             loadConnectionsAndChats();
             setupRealtimeSubscriptions();
-            requestNotificationPermission();
+            checkNotificationPermissionState();
 
             // Handle forwarded payload if redirected from chatroom
             const urlParams = new URLSearchParams(window.location.search);
@@ -160,30 +168,51 @@
            NOTIFICATIONS SETUP & DISPATCHER
         ========================================== */
 
-        function requestNotificationPermission() {
-            if ('Notification' in window && navigator.serviceWorker) {
-                if (Notification.permission === 'default') {
-                    Notification.requestPermission().then((permission) => {
-                        console.log('Notification permission status:', permission);
-                    });
+        function checkNotificationPermissionState() {
+            if ('Notification' in window) {
+                const banner = document.getElementById('notification-banner');
+                if (Notification.permission === 'default' && banner) {
+                    banner.classList.remove('hidden');
+                    banner.classList.add('flex');
                 }
             }
         }
 
-        function triggerSWNotification(title, body, targetUrl) {
-            if ('navigator' in window && navigator.serviceWorker && navigator.serviceWorker.controller) {
-                navigator.serviceWorker.controller.postMessage({
-                    type: 'SHOW_NOTIFICATION',
-                    title: title,
-                    body: body,
-                    url: targetUrl
+        function requestNotificationPermissionUserGesture() {
+            if ('Notification' in window && navigator.serviceWorker) {
+                Notification.requestPermission().then((permission) => {
+                    console.log('Notification permission status:', permission);
+                    const banner = document.getElementById('notification-banner');
+                    if (banner) {
+                        banner.classList.remove('flex');
+                        banner.classList.add('hidden');
+                    }
+                    if (permission === 'granted') {
+                        triggerSWNotification('ChatLite Ready', 'Notifications are now enabled!', './chatlist.html');
+                    }
                 });
-            } else if ('Notification' in window && Notification.permission === 'granted') {
-                // Fallback direct notification if controller isn't immediately active
-                try {
+            }
+        }
+
+        function triggerSWNotification(title, body, targetUrl) {
+            if ('Notification' in window && Notification.permission === 'granted') {
+                if ('navigator' in window && navigator.serviceWorker) {
+                    navigator.serviceWorker.ready.then((registration) => {
+                        registration.showNotification(title, {
+                            body: body,
+                            icon: './icon.png',
+                            badge: './badge.png',
+                            data: { url: targetUrl },
+                            vibrate: [200, 100, 200],
+                            tag: 'chatlite-incoming-msg',
+                            renotify: true
+                        });
+                    }).catch(err => {
+                        console.warn('Service worker ready check failed, falling back to direct notification:', err);
+                        new Notification(title, { body: body, icon: './icon.png' });
+                    });
+                } else {
                     new Notification(title, { body: body, icon: './icon.png' });
-                } catch (e) {
-                    console.warn('Direct notification error:', e);
                 }
             }
         }
