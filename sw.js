@@ -1,16 +1,15 @@
 // --- CHATLITE SERVICE WORKER (OFFLINE CACHE & PUSH NOTIFICATIONS) ---
-const CACHE_NAME = 'chatlite-cache-v2';
+const CACHE_NAME = 'chatlite-cache-v3';
 
-// List all core assets needed to run the app offline
+// List core local static assets needed to run the app offline (excluded external CDNs to prevent CORS/cache errors)
 const ASSETS_TO_CACHE = [
     './',
     './chatlist.html',
     './chatroom.html',
     './groupchat.html',
     './supabase.js',
-    './app.js',
-    'https://cdn.tailwindcss.com',
-    'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2'
+    './icon.png',
+    './badge.png'
 ];
 
 // Install Event: Cache all critical static assets robustly
@@ -47,7 +46,7 @@ self.addEventListener('activate', (event) => {
 
 // Fetch Event: Serve from cache first, fall back to network if online
 self.addEventListener('fetch', (event) => {
-    // Skip Supabase API calls and external extension traffic from being cached
+    // Skip Supabase API calls and external traffic/CDNs from being intercepted/cached incorrectly
     if (event.request.url.includes('supabase.co') || !event.request.url.startsWith(self.location.origin)) {
         return;
     }
