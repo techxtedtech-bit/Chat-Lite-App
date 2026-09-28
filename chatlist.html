@@ -51,7 +51,7 @@
             </button>
         </div>
 
-        <!-- NOTIFICATION PERMISSION BANNER -->
+        <!-- NOTIFICATION PERMISSION BANNER (FIXED: removed conflicting hidden/flex classes) -->
         <div id="notification-banner" class="hidden px-4 py-2 bg-orange-600/20 border-b border-orange-500/30 items-center justify-between text-xs text-orange-300">
             <span>Enable notifications to get message alerts.</span>
             <button onclick="requestNotificationPermissionUserGesture()" class="bg-orange-600 hover:bg-orange-500 text-white font-semibold px-3 py-1 rounded-lg transition-all cursor-pointer">
@@ -205,8 +205,7 @@
                             badge: './badge.png',
                             data: { url: targetUrl },
                             vibrate: [200, 100, 200],
-                            // FIXED: Using a dynamic unique tag per message so cards stack cleanly instead of overriding
-                            tag: 'chatlite-msg-' + Date.now() + '-' + Math.random().toString(36.substring(2, 7)),
+                            tag: 'chatlite-incoming-msg',
                             renotify: true
                         });
                     }).catch(err => {
@@ -250,7 +249,7 @@
                             else if (msg.message_type === 'audio') previewText = '🎤 Sent a voice note';
 
                             const targetUrl = `./chatroom.html?to=${encodeURIComponent(msg.sender_username)}&name=${encodeURIComponent(senderName)}`;
-                            triggerSWNotification(senderName, previewText, targetUrl);
+                            triggerSWNotification(`New message from ${senderName}`, previewText, targetUrl);
                         }
                     }
                 })
