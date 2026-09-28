@@ -1,5 +1,5 @@
 // --- CHATLITE SERVICE WORKER (OFFLINE CACHE & PUSH NOTIFICATIONS) ---
-const CACHE_NAME = 'chatlite-cache-v4';
+const CACHE_NAME = 'chatlite-cache-v5';
 
 // List core local static assets needed to run the app offline (excluded external CDNs to prevent CORS/cache errors)
 const ASSETS_TO_CACHE = [
@@ -91,8 +91,8 @@ self.addEventListener('push', (event) => {
         badge: './badge.png',
         data: { url: data.url || './chatlist.html' },
         vibrate: [200, 100, 200],
-        // UPDATED: Using a dynamic unique tag based on the current timestamp so notifications stack
-        tag: 'chatlite-msg-' + Date.now(),
+        // UPDATED: Using a highly unique dynamic tag to ensure rapid notifications stack correctly
+        tag: 'chatlite-msg-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7),
         renotify: true
     };
 
@@ -111,8 +111,8 @@ self.addEventListener('message', (event) => {
             badge: './badge.png',
             data: { url: url || './chatlist.html' },
             vibrate: [200, 100, 200],
-            // UPDATED: Using a dynamic unique tag based on the current timestamp so notifications stack
-            tag: 'chatlite-msg-' + Date.now(),
+            // UPDATED: Using a highly unique dynamic tag to ensure rapid notifications stack correctly
+            tag: 'chatlite-msg-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7),
             renotify: true
         };
 
