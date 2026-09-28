@@ -1,5 +1,5 @@
 // --- CHATLITE SERVICE WORKER (OFFLINE CACHE & PUSH NOTIFICATIONS) ---
-const CACHE_NAME = 'chatlite-cache-v3';
+const CACHE_NAME = 'chatlite-cache-v4';
 
 // List core local static assets needed to run the app offline (excluded external CDNs to prevent CORS/cache errors)
 const ASSETS_TO_CACHE = [
@@ -9,7 +9,8 @@ const ASSETS_TO_CACHE = [
     './groupchat.html',
     './supabase.js',
     './icon.png',
-    './badge.png'
+    './badge.png',
+    './manifest.json'
 ];
 
 // Install Event: Cache all critical static assets robustly
@@ -69,7 +70,7 @@ self.addEventListener('fetch', (event) => {
 // --- PUSH NOTIFICATION EVENT HANDLER ---
 self.addEventListener('push', (event) => {
     let data = { 
-        title: 'New Message', 
+        title: 'ChatLite', 
         body: 'You have received a new message.', 
         url: './chatlist.html' 
     };
@@ -89,11 +90,13 @@ self.addEventListener('push', (event) => {
         icon: './icon.png', 
         badge: './badge.png',
         data: { url: data.url || './chatlist.html' },
-        vibrate: [200, 100, 200]
+        vibrate: [200, 100, 200],
+        tag: 'chatlite-incoming-msg',
+        renotify: true
     };
 
     event.waitUntil(
-        self.registration.showNotification(data.title, options)
+        self.registration.showNotification(data.title || 'ChatLite', options)
     );
 });
 
@@ -112,7 +115,7 @@ self.addEventListener('message', (event) => {
         };
 
         event.waitUntil(
-            self.registration.showNotification(title || 'New Message', options)
+            self.registration.showNotification(title || 'ChatLite', options)
         );
     }
 });

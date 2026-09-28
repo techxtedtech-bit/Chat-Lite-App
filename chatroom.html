@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Chat Lite - Conversation</title>
+    <link rel="manifest" href="manifest.json">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -642,11 +643,9 @@
                     </div>
                 `;
             } else if (type === 'audio' || msg.content.includes('voice_note_') || msg.content.endsWith('.webm') || msg.content.includes('chat-media/')) {
-                // WhatsApp-Style Voice Note Playback Engine Architecture
                 const uniqueAudioId = 'audio_' + Math.random().toString(36).substring(2, 9);
                 const senderInitial = isMe ? currentUser.username.charAt(0).toUpperCase() : targetName.charAt(0).toUpperCase();
 
-                // Generate simulated audio wave frequency bars
                 let waveformBarsHtml = '';
                 const barHeights = [12, 24, 18, 30, 22, 35, 15, 28, 38, 20, 25, 32, 16, 28, 20, 34, 25, 18, 30, 22, 12];
                 barHeights.forEach((h, idx) => {
@@ -726,7 +725,6 @@
             container.appendChild(wrapper);
         }
 
-        // WhatsApp-Style Voice Note Engine Controls
         function toggleVoiceNotePlay(audioId) {
             const audioElement = document.getElementById(audioId);
             const playBtn = document.getElementById(`play_btn_${audioId}`);
@@ -802,7 +800,6 @@
             audioElement.currentTime = clickRatio * audioElement.duration;
         }
 
-        // WhatsApp-Style Slide-to-Cancel & Lock Mic Gesture Listeners Setup
         const micBtnEl = document.getElementById('mic-btn');
         if (micBtnEl) {
             micBtnEl.addEventListener('touchstart', (e) => {
@@ -818,8 +815,8 @@
                 if (!isRecording || isLockedRecording) return;
                 currentTouchX = e.touches[0].clientX;
                 currentTouchY = e.touches[0].clientY;
-                const diffX = micStartX - currentTouchX; // Positive when sliding left
-                const diffY = micStartY - currentTouchY; // Positive when sliding up
+                const diffX = micStartX - currentTouchX; 
+                const diffY = micStartY - currentTouchY; 
 
                 const hint = document.getElementById('slide-cancel-hint');
                 if (diffX > 20) {
@@ -827,7 +824,6 @@
                     hint.style.transform = `translateX(-${Math.min(diffX, 100)}px)`;
                 }
 
-                // Slide to cancel threshold
                 if (diffX > 120) {
                     cancelRecording();
                     hint.classList.add('hidden');
@@ -835,7 +831,6 @@
                     return;
                 }
 
-                // Swipe up to lock threshold
                 if (diffY > 75) {
                     isLockedRecording = true;
                     hint.classList.add('hidden');
@@ -850,13 +845,11 @@
                 hint.classList.add('hidden');
                 hint.style.transform = 'translateX(0px)';
 
-                // If not locked, releasing finger stops and sends immediately
                 if (!isLockedRecording) {
                     stopRecordingAndSend();
                 }
             });
 
-            // Desktop Mouse Support for Hold-to-Record
             micBtnEl.addEventListener('mousedown', (e) => {
                 e.preventDefault();
                 startVoiceRecording();

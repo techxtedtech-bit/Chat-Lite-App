@@ -52,25 +52,25 @@ function checkNotificationPermissionState() {
     }
 }
 
-function triggerSWNotification(title, body, targetUrl) {
+function triggerSWNotification(senderName, messageBody, targetUrl) {
     if ('Notification' in window && Notification.permission === 'granted') {
         if ('navigator' in window && navigator.serviceWorker) {
             navigator.serviceWorker.ready.then((registration) => {
-                registration.showNotification(title, {
-                    body: body,
+                registration.showNotification(senderName, {
+                    body: messageBody,
                     icon: './icon.png',
                     badge: './badge.png',
                     data: { url: targetUrl || './' },
                     vibrate: [200, 100, 200],
-                    tag: 'chatlite-incoming-msg',
+                    tag: 'chatlite-msg-' + senderName,
                     renotify: true
                 });
             }).catch(err => {
                 console.warn('Service worker ready check failed, falling back to direct notification:', err);
-                new Notification(title, { body: body, icon: './icon.png' });
+                new Notification(senderName, { body: messageBody, icon: './icon.png' });
             });
         } else {
-            new Notification(title, { body: body, icon: './icon.png' });
+            new Notification(senderName, { body: messageBody, icon: './icon.png' });
         }
     }
 }
@@ -102,7 +102,7 @@ function setupGlobalNotificationListener() {
                 let previewText = msg.content || 'New message';
                 if (msg.media_url) previewText = '📎 Sent an attachment';
 
-                triggerSWNotification(`New message from ${senderName}`, previewText, './');
+                triggerSWNotification(senderName, previewText, './');
             }
         })
         .subscribe();
@@ -348,7 +348,7 @@ function appendMessageToDOM(msg) {
 
 async function sendMessage(e, mediaUrl = null) {
     if (e) e.preventDefault();
-    if (!supabaseClient || !currentUser || !activeChatRoom) return; // Note: safe guard checks
+    if (!supabaseClient || !currentUser || !activeChatUser) return;
 
     const input = document.getElementById('message-input');  
     const content = input ? input.value.trim() : '';  
