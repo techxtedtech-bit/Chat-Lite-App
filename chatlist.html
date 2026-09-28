@@ -139,6 +139,7 @@
             initHeaderProfile();
             loadConnectionsAndChats();
             setupRealtimeSubscriptions();
+            requestNotificationPermission();
 
             // Handle forwarded payload if redirected from chatroom
             const urlParams = new URLSearchParams(window.location.search);
@@ -156,6 +157,39 @@
 
 
         /* ==========================================
+           NOTIFICATIONS SETUP & DISPATCHER
+        ========================================== */
+
+        function requestNotificationPermission() {
+            if ('Notification' in window && navigator.serviceWorker) {
+                if (Notification.permission === 'default') {
+                    Notification.requestPermission().then((permission) => {
+                        console.log('Notification permission status:', permission);
+                    });
+                }
+            }
+        }
+
+        function triggerSWNotification(title, body, targetUrl) {
+            if ('navigator' in window && navigator.serviceWorker && navigator.serviceWorker.controller) {
+                navigator.serviceWorker.controller.postMessage({
+                    type: 'SHOW_NOTIFICATION',
+                    title: title,
+                    body: body,
+                    url: targetUrl
+                });
+            } else if ('Notification' in window && Notification.permission === 'granted') {
+                // Fallback direct notification if controller isn't immediately active
+                try {
+                    new Notification(title, { body: body, icon: './icon.png' });
+                } catch (e) {
+                    console.warn('Direct notification error:', e);
+                }
+            }
+        }
+
+
+        /* ==========================================
            REALTIME SUBSCRIPTIONS
         ========================================== */
 
@@ -165,10 +199,28 @@
             // Listen to new private messages
             supabaseClient
                 .channel('public:messages')
-                .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, payload => {
+                .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, async payload => {
                     const msg = payload.new;
                     if (msg.sender_username === currentUser.username || msg.receiver_username === currentUser.username) {
                         loadConnectionsAndChats(true);
+
+                        // If message is incoming for the current user, trigger background/foreground notification preview
+                        if (msg.receiver_username === currentUser.username) {
+                            // Fetch sender profile details for name preview
+                            const { data: senderProfile } = await supabaseClient
+                                .from('profiles')
+                                .select('name, username')
+                                .eq('username', msg.sender_username)
+                                .maybeSingle();
+
+                            const senderName = senderProfile ? (senderProfile.name || senderProfile.username) : msg.sender_username;
+                            let previewText = msg.content || 'New message';
+                            if (msg.message_type === 'image') previewText = '📷 Sent a photo';
+                            else if (msg.message_type === 'audio') previewText = '🎤 Sent a voice note';
+
+                            const targetUrl = `./chatroom.html?to=${encodeURIComponent(msg.sender_username)}&name=${encodeURIComponent(senderName)}`;
+                            triggerSWNotification(`New message from ${senderName}`, previewText, targetUrl);
+                        }
                     }
                 })
                 .subscribe();
@@ -176,8 +228,27 @@
             // Listen to new group messages
             supabaseClient
                 .channel('public:group_messages')
-                .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'group_messages' }, () => {
+                .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'group_messages' }, async payload => {
+                    const gMsg = payload.new;
                     loadConnectionsAndChats(true);
+
+                    // Skip triggering notification if current user sent it
+                    if (gMsg.sender_username !== currentUser.username) {
+                        // Fetch group details
+                        const { data: groupData } = await supabaseClient
+                            .from('groups')
+                            .select('name')
+                            .eq('id', gMsg.group_id)
+                            .maybeSingle();
+
+                        const groupName = groupData ? groupData.name : 'Group Chat';
+                        let previewText = gMsg.message || 'New group message';
+                        if (gMsg.media_type === 'image') previewText = '📷 Photo';
+                        else if (gMsg.media_type === 'audio') previewText = '🎤 Voice note';
+
+                        const targetUrl = `./groupchat.html?id=${encodeURIComponent(gMsg.group_id)}`;
+                        triggerSWNotification(groupName, `@${gMsg.sender_username}: ${previewText}`, targetUrl);
+                    }
                 })
                 .subscribe();
         }

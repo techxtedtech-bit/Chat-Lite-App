@@ -1,5 +1,5 @@
 // --- CHATLITE SERVICE WORKER (OFFLINE CACHE & PUSH NOTIFICATIONS) ---
-const CACHE_NAME = 'chatlite-cache-v1';
+const CACHE_NAME = 'chatlite-cache-v2';
 
 // List all core assets needed to run the app offline
 const ASSETS_TO_CACHE = [
@@ -13,25 +13,29 @@ const ASSETS_TO_CACHE = [
     'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2'
 ];
 
-// Install Event: Cache all critical static assets
+// Install Event: Cache all critical static assets robustly
 self.addEventListener('install', (event) => {
     event.waitUntil(
         caches.open(CACHE_NAME).then((cache) => {
-            console.log('[Service Worker] Caching app shell...');
-            return cache.addAll(ASSETS_TO_CACHE);
+            console.log('[Service Worker] Caching app shell assets...');
+            return Promise.allSettled(
+                ASSETS_TO_CACHE.map(asset => 
+                    cache.add(asset).catch(err => console.warn(`[Service Worker] Failed to cache: ${asset}`, err))
+                )
+            );
         })
     );
     self.skipWaiting();
 });
 
-// Activate Event: Clear out old cache versions when you update code
+// Activate Event: Clear out old cache versions when code updates
 self.addEventListener('activate', (event) => {
     event.waitUntil(
         caches.keys().then((keys) => {
             return Promise.all(
                 keys.map((key) => {
                     if (key !== CACHE_NAME) {
-                        console.log('[Service Worker] Removing old cache:', key);
+                        console.log('[Service Worker] Removing old cache version:', key);
                         return caches.delete(key);
                     }
                 })
@@ -43,8 +47,8 @@ self.addEventListener('activate', (event) => {
 
 // Fetch Event: Serve from cache first, fall back to network if online
 self.addEventListener('fetch', (event) => {
-    // Skip Supabase API calls from being cached by the service worker
-    if (event.request.url.includes('supabase.co')) {
+    // Skip Supabase API calls and external extension traffic from being cached
+    if (event.request.url.includes('supabase.co') || !event.request.url.startsWith(self.location.origin)) {
         return;
     }
 
@@ -83,7 +87,7 @@ self.addEventListener('push', (event) => {
 
     const options = {
         body: data.body,
-        icon: './icon.png', // Optional icon asset fallback
+        icon: './icon.png', 
         badge: './badge.png',
         data: { url: data.url || './chatlist.html' },
         vibrate: [200, 100, 200]
@@ -94,19 +98,22 @@ self.addEventListener('push', (event) => {
     );
 });
 
-// --- CLIENT BACKGROUND MESSAGE LISTENER (SUPABASE REAL-TIME TRIGGER) ---
+// --- CLIENT BACKGROUND MESSAGE LISTENER (SUPABASE REAL-TIME TRIGGER BRIDGE) ---
 self.addEventListener('message', (event) => {
     if (event.data && event.data.type === 'SHOW_NOTIFICATION') {
         const { title, body, url } = event.data;
         const options = {
             body: body || 'New message received',
             icon: './icon.png',
+            badge: './badge.png',
             data: { url: url || './chatlist.html' },
-            vibrate: [200, 100, 200]
+            vibrate: [200, 100, 200],
+            tag: 'chatlite-incoming-msg',
+            renotify: true
         };
 
         event.waitUntil(
-            self.registration.showNotification(title || 'ChatLite Notification', options)
+            self.registration.showNotification(title || 'New Message', options)
         );
     }
 });
@@ -125,7 +132,7 @@ self.addEventListener('notificationclick', (event) => {
                     return client.navigate(targetUrl);
                 }
             }
-            // If no open window exists, open a brand new window pointing straight to the chat room
+            // If no open window exists, open a brand new window pointing straight to the target chat link
             if (clients.openWindow) {
                 return clients.openWindow(targetUrl);
             }
