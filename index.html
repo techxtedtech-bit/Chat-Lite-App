@@ -29,27 +29,27 @@
 
     <div class="min-h-screen flex flex-col w-full max-w-md mx-auto relative shadow-2xl bg-white border-x border-slate-100">
         
-        <!-- Content Area -->
-        <div class="relative z-10 flex flex-col justify-between flex-1 p-6 py-12 min-h-screen">
+        <!-- Content Area: Adjusted spacing to pull logo and buttons upward -->
+        <div class="relative z-10 flex flex-col justify-between flex-1 p-6 pt-10 pb-12 min-h-screen">
             
-            <!-- Spacer to balance layout -->
+            <!-- Top Spacer -->
             <div></div>
 
-            <!-- Center Logo Section -->
+            <!-- Center Logo Section (Enlarged x3) -->
             <div class="flex flex-col items-center justify-center space-y-4 my-auto">
-                <div class="w-40 h-40 flex items-center justify-center transform transition-transform hover:scale-105 duration-300">
+                <div class="w-64 h-64 flex items-center justify-center transform transition-transform hover:scale-105 duration-300">
                     <img src="logo1.png" alt="Chat Lite Logo" class="w-full h-full object-contain drop-shadow-sm">
                 </div>
             </div>
 
-            <!-- Bottom Action Group: Side-by-Side Buttons -->
-            <div class="space-y-4 pt-4 w-full">
+            <!-- Bottom Action Group: Side-by-Side Buttons (Pulled up) -->
+            <div class="space-y-4 pb-6 w-full">
                 <div class="grid grid-cols-2 gap-3 w-full">
-                    <!-- Create Profile Button (Black/Dark theme adapted to white/lemon/black) -->
+                    <!-- Create Profile Button -->
                     <button onclick="window.location.href='register.html'" class="w-full py-4 px-4 bg-slate-900 hover:bg-black text-white font-semibold rounded-xl border border-slate-800 transition-all text-center cursor-pointer shadow-md">
                         Create Profile
                     </button>
-                    <!-- Access Chats Button (Lemon Theme) -->
+                    <!-- Access Chats Button -->
                     <button onclick="openLoginModal()" class="w-full py-4 px-4 bg-[#84cc16] hover:bg-[#65a30d] text-slate-950 font-bold rounded-xl shadow-lg shadow-lime-500/20 transition-all text-center cursor-pointer">
                         Access Chats
                     </button>
